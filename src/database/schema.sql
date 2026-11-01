@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS usuario (
     email       TEXT    NOT NULL UNIQUE,
     senha_hash  TEXT    NOT NULL,
     perfil      TEXT    NOT NULL DEFAULT 'CLIENTE' CHECK (perfil IN ('CLIENTE', 'ADMIN')),
-    criado_em   TEXT    NOT NULL DEFAULT (datetime('now'))
+    criado_em   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS endereco (
@@ -84,14 +84,14 @@ CREATE TABLE IF NOT EXISTS especificacao_produto (
 CREATE TABLE IF NOT EXISTS favorito (
     id_usuario  INTEGER NOT NULL REFERENCES usuario (id_usuario) ON DELETE CASCADE,
     id_produto  INTEGER NOT NULL REFERENCES produto (id_produto) ON DELETE CASCADE,
-    criado_em   TEXT    NOT NULL DEFAULT (datetime('now')),
+    criado_em   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     PRIMARY KEY (id_usuario, id_produto)
 );
 
 CREATE TABLE IF NOT EXISTS carrinho (
     id_carrinho    INTEGER PRIMARY KEY AUTOINCREMENT,
     id_usuario     INTEGER NOT NULL UNIQUE REFERENCES usuario (id_usuario) ON DELETE CASCADE,
-    atualizado_em  TEXT    NOT NULL DEFAULT (datetime('now'))
+    atualizado_em  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS item_carrinho (
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS pedido (
     id_endereco           INTEGER NOT NULL REFERENCES endereco (id_endereco),
     id_cupom              INTEGER REFERENCES cupom (id_cupom) ON DELETE SET NULL,
     numero                TEXT    NOT NULL UNIQUE,
-    criado_em             TEXT    NOT NULL DEFAULT (datetime('now')),
+    criado_em             TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     status                TEXT    NOT NULL DEFAULT 'RASCUNHO' CHECK (status IN ('RASCUNHO', 'AGUARDANDO_PAGAMENTO', 'PAGO', 'ENVIADO', 'ENTREGUE', 'CANCELADO')),
     subtotal_centavos     INTEGER NOT NULL DEFAULT 0,
     frete_centavos        INTEGER NOT NULL DEFAULT 0,
@@ -154,6 +154,21 @@ CREATE TABLE IF NOT EXISTS pagamento (
     valor_centavos   INTEGER NOT NULL,
     cartao_bandeira  TEXT,
     cartao_final     TEXT,
-    criado_em        TEXT    NOT NULL DEFAULT (datetime('now')),
+    criado_em        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     aprovado_em      TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_endereco_usuario ON endereco (id_usuario);
+CREATE INDEX IF NOT EXISTS idx_cartao_usuario ON cartao_salvo (id_usuario);
+CREATE INDEX IF NOT EXISTS idx_veiculo_usuario ON veiculo (id_usuario);
+CREATE INDEX IF NOT EXISTS idx_veiculo_modelo ON veiculo (id_modelo_veiculo);
+CREATE INDEX IF NOT EXISTS idx_produto_categoria ON produto (id_categoria);
+CREATE INDEX IF NOT EXISTS idx_produto_veiculo_modelo ON produto_veiculo (id_modelo_veiculo);
+CREATE INDEX IF NOT EXISTS idx_favorito_produto ON favorito (id_produto);
+CREATE INDEX IF NOT EXISTS idx_item_carrinho_produto ON item_carrinho (id_produto);
+CREATE INDEX IF NOT EXISTS idx_pedido_usuario ON pedido (id_usuario);
+CREATE INDEX IF NOT EXISTS idx_pedido_endereco ON pedido (id_endereco);
+CREATE INDEX IF NOT EXISTS idx_pedido_cupom ON pedido (id_cupom);
+CREATE INDEX IF NOT EXISTS idx_item_pedido_produto ON item_pedido (id_produto);
+CREATE INDEX IF NOT EXISTS idx_pagamento_usuario ON pagamento (id_usuario);
+CREATE INDEX IF NOT EXISTS idx_pagamento_cartao ON pagamento (id_cartao);

@@ -18,11 +18,10 @@ function selecionarCampos(dados = {}, campos) {
 }
 
 function paraId(valor, nome = 'id') {
-  const id = Number(valor);
-  if (!Number.isInteger(id) || id <= 0) {
+  if (!/^[1-9]\d*$/.test(String(valor))) {
     throw new AppError(`${nome} inválido`, 400);
   }
-  return id;
+  return Number(valor);
 }
 
 function paraIdOpcional(valor, nome) {
@@ -59,6 +58,7 @@ function paraOpcao(valor, enumeracao, nome) {
 }
 
 module.exports = {
+  vazio,
   exigirCampos,
   selecionarCampos,
   paraId,

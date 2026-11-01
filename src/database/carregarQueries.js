@@ -12,7 +12,14 @@ function carregarQueries(entidade) {
     queries[nome] = db.prepare(fs.readFileSync(path.join(pasta, arquivo), 'utf8'));
   }
 
-  return queries;
+  return new Proxy(queries, {
+    get(alvo, nome) {
+      if (typeof nome === 'string' && !(nome in alvo)) {
+        throw new Error(`Query "${nome}" não encontrada em queries/${entidade}`);
+      }
+      return alvo[nome];
+    },
+  });
 }
 
 module.exports = carregarQueries;

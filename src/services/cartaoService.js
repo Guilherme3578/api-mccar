@@ -77,4 +77,4 @@ function remover(usuarioLogado, id) {
   });
 }
 
-module.exports = { buscarPorId, listar, buscar, criar, atualizar, remover };
+module.exports = { normalizar, buscarPorId, listar, buscar, criar, atualizar, remover };

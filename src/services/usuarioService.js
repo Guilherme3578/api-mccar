@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const usuarioRepository = require('../repositories/usuarioRepository');
 const carrinhoRepository = require('../repositories/carrinhoRepository');
+const cupomService = require('./cupomService');
 const Perfil = require('../enums/Perfil');
 const { transacao } = require('../config/database');
 const AppError = require('../utils/AppError');
@@ -60,11 +61,13 @@ function criar(dados) {
     senha_hash: gerarHashSenha(dados.senha),
   };
 
-  return transacao(() => {
-    const criado = usuarioRepository.inserir(usuario);
-    carrinhoRepository.inserir({ id_usuario: criado.id_usuario });
-    return criado;
+  const criado = transacao(() => {
+    const novo = usuarioRepository.inserir(usuario);
+    carrinhoRepository.inserir({ id_usuario: novo.id_usuario });
+    return novo;
   });
+
+  return { ...criado, cupom_boas_vindas: cupomService.cupomBoasVindasDisponivel() };
 }
 
 function atualizar(usuarioLogado, id, dados) {

@@ -5,6 +5,7 @@ function inteiroDoAmbiente(nome, padrao) {
 
 module.exports = Object.freeze({
   valorPadraoCentavos: inteiroDoAmbiente('FRETE_PADRAO_CENTAVOS', 2990),
+  gratisAcimaCentavos: inteiroDoAmbiente('FRETE_GRATIS_ACIMA_CENTAVOS', 10000),
   transporteMinDias: inteiroDoAmbiente('FRETE_TRANSPORTE_MIN_DIAS', 2),
   transporteMaxDias: inteiroDoAmbiente('FRETE_TRANSPORTE_MAX_DIAS', 7),
 });

@@ -4,6 +4,10 @@ validarAmbiente();
 
 const os = require('os');
 const app = require('./app');
+const { db } = require('./config/database');
+const cupomService = require('./services/cupomService');
+
+cupomService.garantirCupomBoasVindas();
 
 const porta = Number(process.env.PORT) || 3000;
 
@@ -14,9 +18,19 @@ function enderecosDeRede() {
     .map((rede) => rede.address);
 }
 
-app.listen(porta, '0.0.0.0', () => {
+const servidor = app.listen(porta, '0.0.0.0', () => {
   console.log(`API MCCAR rodando em http://localhost:${porta}`);
   for (const ip of enderecosDeRede()) {
     console.log(`Acesso pela rede (Expo): http://${ip}:${porta}`);
   }
 });
+
+function encerrar() {
+  servidor.close(() => {
+    db.close();
+    process.exit(0);
+  });
+}
+
+process.on('SIGINT', encerrar);
+process.on('SIGTERM', encerrar);

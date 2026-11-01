@@ -1,4 +1,6 @@
 const cupomRepository = require('../repositories/cupomRepository');
+const pedidoRepository = require('../repositories/pedidoRepository');
+const cupomBoasVindas = require('../config/cupomBoasVindas');
 const TipoCupom = require('../enums/TipoCupom');
 const AppError = require('../utils/AppError');
 const { exigirCampos, selecionarCampos, paraInteiro, paraFlag, paraTextoOpcional, paraOpcao } = require('../utils/validacao');
@@ -61,7 +63,7 @@ function buscarPorCodigo(codigo) {
   return cupom;
 }
 
-function validarParaUso(id) {
+function validarParaUso(id, idUsuario, idPedido = 0) {
   const cupom = buscarPorId(id);
   if (!cupom.ativo) {
     throw new AppError('Cupom inativo', 400);
@@ -69,7 +71,36 @@ function validarParaUso(id) {
   if (cupom.valido_ate && cupom.valido_ate < hoje()) {
     throw new AppError('Cupom expirado', 400);
   }
+  if (pedidoRepository.contarUsosDoCupom(idUsuario, cupom.id_cupom, idPedido) > 0) {
+    throw new AppError(`Você já utilizou o cupom ${cupom.codigo}`, 400);
+  }
+  if (cupom.codigo === cupomBoasVindas.codigo && pedidoRepository.contarComprasDoUsuario(idUsuario, idPedido) > 0) {
+    throw new AppError(`O cupom ${cupom.codigo} é válido apenas na primeira compra`, 400);
+  }
   return cupom;
+}
+
+function garantirCompraMinima(cupom, subtotalCentavos) {
+  if (subtotalCentavos < cupom.minimo_compra_centavos) {
+    const minimo = (cupom.minimo_compra_centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    throw new AppError(`O cupom ${cupom.codigo} exige compra mínima de ${minimo}`, 400);
+  }
+}
+
+function garantirCupomBoasVindas() {
+  if (!cupomRepository.buscarPorCodigo(cupomBoasVindas.codigo)) {
+    cupomRepository.inserir({
+      ...cupomBoasVindas,
+      minimo_compra_centavos: 0,
+      valido_ate: null,
+      ativo: 1,
+    });
+  }
+}
+
+function cupomBoasVindasDisponivel() {
+  const cupom = cupomRepository.buscarPorCodigo(cupomBoasVindas.codigo);
+  return cupom && cupom.ativo ? cupom.codigo : null;
 }
 
 function calcularDesconto(cupom, subtotalCentavos) {
@@ -97,6 +128,9 @@ module.exports = {
   buscarPorId,
   buscarPorCodigo,
   validarParaUso,
+  garantirCompraMinima,
+  garantirCupomBoasVindas,
+  cupomBoasVindasDisponivel,
   calcularDesconto,
   criar,
   atualizar,

@@ -2,7 +2,7 @@
 
 **Projeto Integrador · SENAC 4º semestre · Desenvolvimento Mobile**
 **Responsável pelo backend:** Guilherme Israel dos Santos
-**Última atualização:** 30/10/2026
+**Última atualização:** 01/11/2026
 
 ---
 
@@ -17,7 +17,7 @@ API REST do e-commerce de autopeças **MCCAR**, consumida por um app em **React 
 | Banco de dados | SQLite (arquivo local), via `better-sqlite3` |
 | Autenticação | JWT (`jsonwebtoken`) + senha com `bcryptjs` |
 | Arquitetura | Routes → Guards → Controllers → Services → Repositories → SQL |
-| Testes manuais | Postman |
+| Testes | Automatizados com `node:test` (`npm test`) + collection do Postman |
 | Visualização do banco | Extensão SQLite Viewer (VS Code) + `sqlite3` instalado no Windows |
 
 ### Princípios combinados
@@ -36,7 +36,10 @@ api-mccar/
 ├── .env                       configuração local (NÃO vai para o git)
 ├── .env.example               modelo do .env para a equipe
 ├── package.json
+├── README.md                  guia para a equipe do front
 ├── data/mccar.db              banco SQLite (criado automaticamente, fora do git)
+├── postman/                   collection do Postman (82 requisições)
+├── tests/                     7 baterias de testes automatizados + apoio.js
 └── src/
     ├── server.js              valida o .env e sobe o servidor (mostra o IP para o Expo)
     ├── app.js                 express, cors, json, rotas, 404 e tratamento de erros
@@ -45,9 +48,10 @@ api-mccar/
     │   ├── env.js             validação das variáveis obrigatórias na inicialização
     │   └── frete.js           valores de frete e prazo (lidos do .env)
     ├── database/
-    │   ├── schema.sql         as 16 tabelas
+    │   ├── schema.sql         as 16 tabelas e os índices
+    │   ├── seed.sql           catálogo de exemplo (22 produtos, 7 categorias, 5 carros)
     │   ├── carregarQueries.js lê a pasta da entidade e prepara cada .sql pelo nome
-    │   └── queries/<entidade>/<operacao>.sql   97 arquivos de query
+    │   └── queries/<entidade>/<operacao>.sql   99 arquivos de query
     ├── enums/                 Perfil, StatusPedido, StatusPagamento, MetodoPagamento, TipoCupom
     ├── guards/
     │   ├── authGuard.js       valida o JWT e carrega o usuário do banco
@@ -58,7 +62,10 @@ api-mccar/
     ├── controllers/           16 controllers (só req/res)
     ├── services/              17 services (regras de negócio) + freteService
     ├── repositories/          16 repositories (só executam as queries)
-    ├── scripts/promoverAdmin.js   transforma um usuário em ADMIN
+    ├── scripts/
+    │   ├── promoverAdmin.js   transforma um usuário em ADMIN
+    │   ├── seed.js            roda o seed.sql
+    │   └── setup.js           primeira instalação: cria o .env com segredo e roda o seed
     └── utils/
         ├── AppError.js        erro com status HTTP
         ├── validacao.js       exigirCampos, paraId, paraInteiro, paraFlag, paraOpcao...
@@ -85,6 +92,7 @@ Qualquer erro em qualquer camada → errorHandler → { "erro": "mensagem" } com
 - `UNIQUE` em e-mail, código de produto, nome de categoria, código de cupom, carrinho por usuário e pagamento por pedido.
 - `ON DELETE CASCADE` nos dados pessoais (excluir o usuário apaga endereços, cartões, favoritos e carrinho).
 - Os dados com histórico (pedidos, pagamentos) **não** são apagados em cascata: a exclusão é bloqueada.
+- Índices em todas as chaves estrangeiras que não são o início de uma chave primária ou única.
 
 ### ⚠️ Mudança em relação ao DER original
 | Tabela | Campo novo | Motivo |
@@ -94,7 +102,7 @@ Qualquer erro em qualquer camada → errorHandler → { "erro": "mensagem" } com
 > **Ação:** atualizar o diagrama da equipe com esse campo.
 
 ### Tipos
-`String` do DER vira `TEXT`, `Integer` vira `INTEGER` e `Float` vira `REAL`. As datas são `TEXT`, geradas pelo SQLite em UTC.
+`String` do DER vira `TEXT`, `Integer` vira `INTEGER` e `Float` vira `REAL`. As datas são `TEXT` em ISO 8601 com fuso UTC (`2026-11-01T14:30:00Z`), geradas pelo SQLite.
 
 ---
 
@@ -102,8 +110,7 @@ Qualquer erro em qualquer camada → errorHandler → { "erro": "mensagem" } com
 
 ### Primeira vez
 1. `npm install`
-2. Copiar `.env.example` para `.env` e preencher o **`JWT_SECRET`**. Para gerar:
-   `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`
+2. `npm run setup`: cria o `.env` a partir do `.env.example`, com um `JWT_SECRET` gerado na hora, e preenche o catálogo.
 3. `npm run dev`. O banco é criado sozinho em `data/mccar.db`.
 4. Cadastrar um usuário (`POST /usuarios`) e torná-lo admin:
    `npm run admin -- email@exemplo.com`
@@ -114,6 +121,8 @@ Qualquer erro em qualquer camada → errorHandler → { "erro": "mensagem" } com
 | `npm run dev` | Sobe com nodemon, recarregando ao mudar `.js` ou `.sql` |
 | `npm start` | Sobe sem recarregar |
 | `npm run admin -- <email>` | Promove o usuário a ADMIN |
+| `npm run seed` | Preenche o catálogo de exemplo, sem duplicar se rodar de novo |
+| `npm test` | Roda as 7 baterias de testes, cada uma num banco temporário |
 
 ### Variáveis do `.env`
 | Variável | Obrigatória | Padrão | Uso |
@@ -123,8 +132,10 @@ Qualquer erro em qualquer camada → errorHandler → { "erro": "mensagem" } com
 | `JWT_SECRET` | **sim**, com no mínimo 32 caracteres | — | Chave que assina os tokens |
 | `JWT_EXPIRES_IN` | não | `1d` | Validade do token |
 | `FRETE_PADRAO_CENTAVOS` | não | 2990 | Valor do frete |
+| `FRETE_GRATIS_ACIMA_CENTAVOS` | não | 10000 | A partir desse valor, o frete é grátis |
 | `FRETE_TRANSPORTE_MIN_DIAS` | não | 2 | Prazo mínimo de transporte |
 | `FRETE_TRANSPORTE_MAX_DIAS` | não | 7 | Prazo máximo de transporte |
+| `PAGAMENTO_APROVACAO_AUTOMATICA` | não | `false` | `true` aprova PIX e cartão na hora (simula o gateway, usado na demonstração). Boleto sempre espera o admin |
 
 > Por que não tem usuário e senha do banco? O SQLite não é um servidor: é um arquivo. Basta o caminho (`DB_PATH`). Já o `JWT_SECRET` é a chave que assina os tokens de login. Quem conhece essa chave consegue se passar por qualquer usuário, por isso ela fica só no `.env`.
 
@@ -186,7 +197,7 @@ O app deve usar o endereço da rede, com o PC e o celular no mesmo Wi-Fi.
 |---|---|
 | `/categorias` | Nome único |
 | `/modelos-veiculo` | marca, modelo, ano |
-| `/produtos` | Filtros: `?id_categoria=`, `?id_modelo_veiculo=`, `?destaque=`, `?ativo=`, `?busca=`. O GET `/:id` já traz especificações e veículos compatíveis |
+| `/produtos` | Filtros: `?id_categoria=`, `?id_modelo_veiculo=`, `?destaque=`, `?ativo=`, `?busca=` (nome, marca ou código). Ordenação: `?ordenar=relevancia\|menor_preco\|maior_preco\|avaliacao\|nome`. O GET `/:id` já traz especificações e veículos compatíveis |
 | `/produtos/:idProduto/especificacoes` | PUT e DELETE em `/:nome` |
 | `/produtos/:idProduto/veiculos` | POST `{ id_modelo_veiculo }`, DELETE `/:idModeloVeiculo` |
 
@@ -199,7 +210,7 @@ O app deve usar o endereço da rede, com o PC e o celular no mesmo Wi-Fi.
 ### Carrinho, 🔑
 | Método | Rota | Observação |
 |---|---|---|
-| GET | `/carrinhos/meu` | **Rota principal para o app.** Traz os itens e o total |
+| GET | `/carrinhos/meu` | **Rota principal para o app.** Traz os itens (com a marca), subtotal, frete, prazo e total. `?cupom=CODIGO` aplica o desconto no resumo, para a tela de checkout |
 | GET | `/carrinhos`, `/carrinhos/:id` | |
 | POST / DELETE | `/carrinhos`, `/carrinhos/:id` | Normalmente desnecessários, porque o carrinho nasce com o usuário |
 | GET, POST | `/carrinhos/:idCarrinho/itens` | POST `{ id_produto, quantidade }` |
@@ -218,7 +229,7 @@ O app deve usar o endereço da rede, com o PC e o celular no mesmo Wi-Fi.
 ### Pagamentos
 | Método | Rota | Acesso | Observação |
 |---|---|---|---|
-| POST | `/pagamentos` | 🔑 | `{ id_pedido, metodo: CARTAO\|PIX\|BOLETO, id_cartao? }`. Se o anterior foi recusado, reabre a tentativa |
+| POST | `/pagamentos` | 🔑 | `{ id_pedido, metodo: CARTAO\|PIX\|BOLETO }`. No cartão: `id_cartao` (salvo) ou `cartao: { bandeira, ultimos_quatro, nome_titular }` + `salvar_cartao?` (novo). Se o anterior foi recusado, reabre a tentativa |
 | GET | `/pagamentos`, `/pagamentos/:id` | 🔑 | |
 | PUT | `/pagamentos/:id` | 👑 | `{ status }` |
 | DELETE | `/pagamentos/:id` | 👑 | Só `PENDENTE` ou `RECUSADO` |
@@ -253,13 +264,15 @@ PENDENTE ──► APROVADO ──► ESTORNADO
 - O valor do pagamento é sempre o total do pedido, nunca um valor enviado pelo app.
 
 ### 7.3 Frete e prazo (calculados no backend)
-- **Frete:** R$ 29,90. É **grátis** quando **todos** os itens oferecem frete grátis (`frete_gratis_acima_centavos > 0`) **e** o subtotal atinge o **maior** limite entre eles.
+- **Frete:** R$ 29,90. É **grátis quando o valor dos produtos, já com o desconto do cupom, chega a R$ 100** (`FRETE_GRATIS_ACIMA_CENTAVOS`). O campo `frete_gratis_acima_centavos` do produto não é mais usado nesse cálculo.
 - **Prazo:** dias de envio (o maior `prazo_envio_horas` dos itens, convertido em dias) somados a 2 a 7 dias de transporte.
 - O app **não** define o frete. Se mandar o campo, ele é ignorado.
 
 ### 7.4 Cupom
 - Tipos `PERCENTUAL` (de 1 a 100) ou `VALOR` (em centavos). O desconto nunca passa do subtotal.
 - É validado ao ser vinculado e **revalidado na finalização** (ativo, dentro da validade, mínimo de compra atingido).
+- **Cada cupom vale uma vez por usuário.** Um pedido cancelado devolve o cupom.
+- **Cupom de boas-vindas `BEMVINDO50`:** 50% de desconto, válido só na primeira compra. É criado automaticamente quando a API sobe, e o cadastro devolve o código no campo `cupom_boas_vindas`, para o app mostrar ao usuário.
 
 ### 7.5 Snapshot (cópia dos dados no momento da compra)
 - O pedido copia o **endereço** para os campos `entrega_*`, então mudar o endereço depois não altera o pedido.
@@ -325,15 +338,56 @@ Levantamento de **32 pontos de melhoria** em 6 tópicos (segurança, regras de n
 | R6 | Promoção automática do principal, carrinho criado no cadastro, `GET /carrinhos/meu`, veículo duplicado bloqueado, avaliação não editável, nova tentativa de pagamento |
 | Q1 (adiantado) | Enums para todos os status, métodos, tipos e perfil. Nenhuma string de status solta no código |
 
-### Testes executados
-Três baterias automatizadas, feitas fora do repositório e rodadas contra bancos temporários:
+### Fase 5: regras decididas com a equipe ✅
+| Entrega |
+|---|
+| Cada cupom vale uma vez por usuário. Pedido cancelado devolve o cupom |
+| Cupom de boas-vindas `BEMVINDO50` (50% na primeira compra), criado automaticamente e devolvido no cadastro |
+| Frete grátis a partir de R$ 100 em produtos, já com o desconto |
 
-| Bateria | Verificações | Resultado |
+### Fase 6: preparação para a entrega ao front ✅
+| Item | Entrega |
+|---|---|
+| O1 | `seed.sql` com 22 produtos da prova, preços de mercado, especificações e compatibilidade com 5 carros; `npm run seed` |
+| B1 | Datas em ISO 8601 com `Z` (`2026-11-01T14:30:00Z`), seguras para `new Date()` no Hermes |
+| B3 | Índices nas chaves estrangeiras |
+| Q5 | `carregarQueries` acusa o nome de uma query inexistente em vez de falhar com `undefined` |
+| O2 | Baterias de testes no repositório (hoje são 7) com `node:test` (`npm test`), cada uma com servidor e banco temporários próprios |
+| O3 | Removidas as dependências `init` e `npm`; o servidor fecha o banco ao ser encerrado (Ctrl+C) |
+| A3 | `README.md` para a equipe do front e collection do Postman com 82 requisições, que salva token e ids sozinha |
+| Instalação | `npm run setup` (cria o `.env` com segredo e roda o seed). `.npmrc` com `ignore-scripts=true`: sem ele, o `npm install` num PC sem Visual Studio quebrava ao tentar compilar o `better-sqlite3`, que já traz o binário pronto. Testado num clone limpo |
+| Demonstração | Aprovação automática de PIX e cartão (`PAGAMENTO_APROVACAO_AUTOMATICA`), para o fluxo de compra andar sozinho no vídeo. Bateria nova `pagamentoAutomatico.test.js` |
+| Correção | O id da URL aceitava `0x10` e `1e1` (`GET /produtos/0x10` devolvia o produto 16). Agora só aceita dígitos |
+
+### Fase 7: revisão das telas do Figma ✅
+As 10 telas do Figma foram comparadas com a API. Login, Cadastro, Home, Produto, Confirmação e Perfil já estavam cobertas. O que faltava foi implementado:
+
+| Tela | Faltava | Entrega |
 |---|---|---|
-| Fluxo completo (cadastro até pagamento) | 57 | ✅ todas passando |
-| Segurança (acesso indevido, tokens forjados, força bruta) | 73 | ✅ todas passando |
-| Regras de negócio (status, frete, cupom, checkout) | 109 | ✅ todas passando |
-| **Total** | **239** | ✅ |
+| 4 · Carrinho | Frete estimado, total com frete e a marca do item | `GET /carrinhos/meu` devolve itens com marca, `quantidade_itens`, subtotal, frete, prazo e total, com a mesma regra do pedido |
+| 5 · Checkout | Resumo com cupom **antes** de fazer o pedido | `GET /carrinhos/meu?cupom=CODIGO` aplica o desconto e valida o cupom para o usuário (400/404 com mensagem). O pedido sai com os mesmos valores do resumo |
+| 6 · Pagamento | Pagar com cartão novo e "Salvar cartão para próximas compras" | `POST /pagamentos` aceita `cartao: { bandeira, ultimos_quatro, nome_titular }` e `salvar_cartao`. Nunca recebe o número completo nem o CVV |
+| 2 · Listagem | Ordenação ("Relevância") | `?ordenar=` com enum `OrdenacaoProduto` (relevância, menor e maior preço, avaliação, nome) |
+| 7 e 9 · Pedido | Número curto | Número no formato `MC-30523`, sem repetir |
+
+A regra de compra mínima do cupom passou para o `cupomService` (`garantirCompraMinima`), e agora o carrinho e o pedido usam a mesma verificação.
+
+### Testes automatizados (`npm test`)
+| Bateria | Arquivo | Verificações | Resultado |
+|---|---|---|---|
+| CRUDs de todas as entidades | `crud.test.js` | 58 | ✅ |
+| Segurança (acesso indevido, tokens forjados, força bruta) | `seguranca.test.js` | 69 | ✅ |
+| Regras de negócio (status, frete, cupom, checkout) | `regras.test.js` | 99 | ✅ |
+| Cupom por usuário e boas-vindas | `cupom.test.js` | 28 | ✅ |
+| Rotas sem conflito, ids malformados, datas ISO | `rotas.test.js` | 37 | ✅ |
+| Aprovação automática do pagamento | `pagamentoAutomatico.test.js` | 18 | ✅ |
+| Telas do Figma (carrinho, checkout, pagamento, listagem, pedidos) | `telas.test.js` | 50 | ✅ |
+| **Total** | | **359** | ✅ |
+
+Para confirmar que os testes detectam erros de verdade, a regra de frete foi alterada de propósito: as baterias de regras e de cupom falharam e apontaram a verificação exata.
+
+### Conflitos de rotas
+Nenhum. As rotas fixas (`/usuarios/me`, `/usuarios/login`, `/carrinhos/meu`, `/cupons/codigo/:codigo`, `/pedidos/checkout`, `/usuarios/:id/perfil`) são registradas antes das genéricas `/:id`. As rotas aninhadas (`/produtos/:idProduto/...`, `/carrinhos/:idCarrinho/itens`, `/pedidos/:idPedido/itens`, `/usuarios/:idUsuario/favoritos`) são registradas antes da rota pai e recebem o id dela (`mergeParams`). A bateria `rotas.test.js` cobre esses casos.
 
 ---
 
@@ -343,11 +397,12 @@ Três baterias automatizadas, feitas fora do repositório e rodadas contra banco
 ```
 1. POST /usuarios/login                → guardar o token
 2. GET  /produtos?busca=pastilha       → catálogo (sem token)
-3. GET  /carrinhos/meu                 → pegar o id_carrinho
+3. GET  /carrinhos/meu                 → itens, frete e total (pegar o id_carrinho)
 4. POST /carrinhos/:id/itens           → { id_produto, quantidade }
-5. POST /pedidos/checkout              → { id_endereco, id_cupom? }
-6. POST /pagamentos                    → { id_pedido, metodo, id_cartao? }
-7. GET  /pedidos/:id                   → acompanhar o status
+5. GET  /carrinhos/meu?cupom=CODIGO    → resumo do checkout com desconto
+6. POST /pedidos/checkout              → { id_endereco, id_cupom? }
+7. POST /pagamentos                    → { id_pedido, metodo, id_cartao? ou cartao + salvar_cartao? }
+8. GET  /pedidos/:id                   → acompanhar o status
 ```
 
 **Cuidados:**
@@ -357,7 +412,8 @@ Três baterias automatizadas, feitas fora do repositório e rodadas contra banco
 - Valores em **centavos**: dividir por 100 para exibir.
 - O campo `perfil` do login pode ser usado para esconder as telas de admin.
 - Tratar o 401 (mandar para o login), o 403 (sem permissão) e o 429 (aguardar).
-- As datas vêm em UTC no formato `AAAA-MM-DD HH:MM:SS`. Ver o item B1 do backlog antes de usar `new Date()`.
+- As datas vêm em ISO 8601 UTC (`2026-11-01T14:30:00Z`) e funcionam direto com `new Date()`.
+- O guia completo está no `README.md`, e a collection do Postman na pasta `postman/`.
 
 ---
 
@@ -370,15 +426,15 @@ Três baterias automatizadas, feitas fora do repositório e rodadas contra banco
 | Q2 | Camada `validators/` por entidade, devolvendo todos os erros de uma vez | ⏳ |
 | Q3 | Validações mais rígidas (rejeitar boolean inválido, limites de tamanho de texto) | ⏳ |
 | Q4 | Helper para a lógica de "principal" repetida 3 vezes | ⏳ |
-| Q5 | `carregarQueries` acusando o nome de query inexistente | ⏳ |
+| Q5 | `carregarQueries` acusando o nome de query inexistente | ✅ feito |
 | Q6 | Centralizar as mensagens e os status HTTP (opcional) | ⏳ |
 
 ### Tópico 4: banco de dados
 | Item | Descrição | Status |
 |---|---|---|
-| B1 | 🔴 Datas em ISO 8601 com fuso (`2026-10-30T02:51:56Z`). O formato atual pode virar `Invalid Date` no React Native (Hermes) | ⏳ prioritário |
+| B1 | Datas em ISO 8601 com fuso (`2026-11-01T14:30:00Z`) | ✅ feito |
 | B2 | Migrations versionadas (`001_inicial.sql`...) para mudar o schema sem apagar o banco | ⏳ recomendado antes de novas mudanças no DER |
-| B3 | Índices nas chaves estrangeiras | ⏳ |
+| B3 | Índices nas chaves estrangeiras | ✅ feito |
 | B4 | Inativar em vez de excluir (muda o DER) | ⏳ precisa de acordo |
 | B5 | Busca sem acento (muda o DER) | ⏳ precisa de acordo |
 
@@ -387,33 +443,31 @@ Três baterias automatizadas, feitas fora do repositório e rodadas contra banco
 |---|---|---|
 | A1 | Paginação (`?pagina=&limite=`) | ⏳ |
 | A2 | PUT parcial vira PATCH, ou fica documentado | ⏳ |
-| A3 | Collection do Postman e README | ⏳ |
+| A3 | Collection do Postman e README | ✅ feito |
 | A4 | Erros indicando o campo (`{ erro, campos }`) | ⏳ |
 
 ### Tópico 6: projeto e operação
 | Item | Descrição | Status |
 |---|---|---|
-| O1 | `seed.sql` com dados de exemplo para o front | ⏳ |
-| O2 | Testes automatizados no repositório (`npm test` com `node:test`) | ⏳ |
-| O3 | Remover dependências instaladas por engano (`init`, `npm`), log de requisições, encerramento limpo do banco | ⏳ |
+| O1 | `seed.sql` com dados de exemplo para o front | ✅ feito |
+| O2 | Testes automatizados no repositório (`npm test` com `node:test`) | ✅ feito |
+| O3 | Remover dependências instaladas por engano (`init`, `npm`) e encerramento limpo do banco | ✅ feito (o log de requisições ficou de fora, por ser opcional) |
 
 ---
 
 ## 12. Decisões pendentes (alinhar com a equipe)
 
-1. **Cupom: uso limitado a 1 vez por usuário?** A sugestão é sim.
-2. **A regra de frete grátis da seção 7.3 serve para a equipe?**
+1. ~~Cupom limitado a 1 uso por usuário~~ ✅ decidido e implementado, com o cupom de boas-vindas.
+2. ~~Regra de frete grátis~~ ✅ decidido: grátis a partir de R$ 100.
 3. **Atualizar o DER** com o campo `usuario.perfil`.
 4. **B4 (inativar em vez de excluir) e B5 (busca sem acento)** mudam o DER. Aprovar ou não.
-5. **Próximo passo sugerido:** B1 (datas, que afetam o front diretamente), depois B2, O1 e A3.
+5. **Próximo passo sugerido:** o que sobrou do backlog é melhoria e não bloqueia a entrega. Se o DER for mudar (B4/B5), fazer antes o B2 (migrations).
 
 ---
 
 ## 13. Pontos de atenção
 
-- ⚠️ **Nada foi commitado ainda.** Fazer o primeiro commit antes de continuar.
-- ⚠️ O **`JWT_SECRET` do `.env` local está vazio**, e a API não sobe assim. Gerar um segredo (seção 4).
-- O arquivo `src/routes/index.js` foi renomeado para `routes.js`, e o `app.js` já foi ajustado.
+- ⚠️ Quem tiver um `data/mccar.db` criado antes de 01/11 precisa apagá-lo e rodar `npm run seed`, porque o banco antigo continua gravando as datas no formato anterior.
 - O bloqueio de login fica na memória e zera quando o servidor reinicia.
 - Trocar a senha não derruba sessões já abertas (o token vale até expirar).
 - O preço do item adicionado manualmente a um pedido em rascunho fica fixo desde a inclusão. O checkout não tem esse problema.

@@ -4,10 +4,11 @@ const cartaoService = require('./cartaoService');
 const StatusPagamento = require('../enums/StatusPagamento');
 const StatusPedido = require('../enums/StatusPedido');
 const MetodoPagamento = require('../enums/MetodoPagamento');
+const configPagamento = require('../config/pagamento');
 const { transacao } = require('../config/database');
 const AppError = require('../utils/AppError');
 const { garantirDono, idUsuarioDoFiltro } = require('../utils/acesso');
-const { exigirCampos, paraId, paraIdOpcional, paraOpcao } = require('../utils/validacao');
+const { vazio, exigirCampos, paraId, paraIdOpcional, paraFlag, paraOpcao } = require('../utils/validacao');
 
 const TRANSICOES = Object.freeze({
   [StatusPagamento.PENDENTE]: [StatusPagamento.APROVADO, StatusPagamento.RECUSADO],
@@ -39,16 +40,30 @@ function buscar(usuarioLogado, id) {
   return pagamento;
 }
 
-function dadosDoCartao(metodo, idCartao, idUsuario) {
+function cartaoInformado(dados, idUsuario) {
+  if (!vazio(dados.id_cartao)) {
+    const cartao = cartaoService.buscarPorId(paraId(dados.id_cartao, 'id_cartao'));
+    if (cartao.id_usuario !== idUsuario) {
+      throw new AppError('O cartão não pertence ao usuário do pedido', 403);
+    }
+    return cartao;
+  }
+
+  if (!dados.cartao || typeof dados.cartao !== 'object') {
+    throw new AppError('Informe id_cartao (cartão salvo) ou cartao: { bandeira, ultimos_quatro, nome_titular }', 400);
+  }
+  if (paraFlag(dados.salvar_cartao)) {
+    return cartaoService.criar({ id_usuario: idUsuario }, dados.cartao);
+  }
+  return { id_cartao: null, ...cartaoService.normalizar(dados.cartao) };
+}
+
+function dadosDoCartao(metodo, dados, idUsuario) {
   if (metodo !== MetodoPagamento.CARTAO) {
     return { id_cartao: null, cartao_bandeira: null, cartao_final: null };
   }
 
-  const cartao = cartaoService.buscarPorId(paraId(idCartao, 'id_cartao'));
-  if (cartao.id_usuario !== idUsuario) {
-    throw new AppError('O cartão não pertence ao usuário do pedido', 403);
-  }
-
+  const cartao = cartaoInformado(dados, idUsuario);
   return { id_cartao: cartao.id_cartao, cartao_bandeira: cartao.bandeira, cartao_final: cartao.ultimos_quatro };
 }
 
@@ -60,27 +75,29 @@ function criar(usuarioLogado, dados) {
   if (pedido.status !== StatusPedido.AGUARDANDO_PAGAMENTO) {
     throw new AppError('O pedido precisa estar com status AGUARDANDO_PAGAMENTO', 400);
   }
-  if (metodo === MetodoPagamento.CARTAO) {
-    exigirCampos(dados, ['id_cartao']);
-  }
-
-  const pagamento = {
-    id_pedido: pedido.id_pedido,
-    id_usuario: pedido.id_usuario,
-    metodo,
-    valor_centavos: pedido.total_centavos,
-    ...dadosDoCartao(metodo, dados.id_cartao, pedido.id_usuario),
-  };
-
   const existente = pagamentoRepository.buscarPorPedido(pedido.id_pedido);
-  if (!existente) {
-    return pagamentoRepository.inserir(pagamento);
-  }
-  if (existente.status !== StatusPagamento.RECUSADO) {
+  if (existente && existente.status !== StatusPagamento.RECUSADO) {
     throw new AppError(`Este pedido já possui um pagamento com status ${existente.status}`, 409);
   }
 
-  return pagamentoRepository.reabrir({ ...pagamento, id_pagamento: existente.id_pagamento });
+  return transacao(() => {
+    const pagamento = {
+      id_pedido: pedido.id_pedido,
+      id_usuario: pedido.id_usuario,
+      metodo,
+      valor_centavos: pedido.total_centavos,
+      ...dadosDoCartao(metodo, dados, pedido.id_usuario),
+    };
+
+    const registrado = existente
+      ? pagamentoRepository.reabrir({ ...pagamento, id_pagamento: existente.id_pagamento })
+      : pagamentoRepository.inserir(pagamento);
+
+    if (configPagamento.aprovacaoAutomatica && configPagamento.metodosAprovadosNaHora.includes(metodo)) {
+      return atualizar(registrado.id_pagamento, { status: StatusPagamento.APROVADO });
+    }
+    return registrado;
+  });
 }
 
 function atualizar(id, dados) {

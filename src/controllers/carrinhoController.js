@@ -6,11 +6,11 @@ function listar(req, res) {
 }
 
 function buscarPorId(req, res) {
-  res.json(carrinhoService.detalhar(req.usuario, paraId(req.params.id)));
+  res.json(carrinhoService.detalhar(req.usuario, paraId(req.params.id), req.query.cupom));
 }
 
 function meu(req, res) {
-  res.json(carrinhoService.meu(req.usuario));
+  res.json(carrinhoService.meu(req.usuario, req.query.cupom));
 }
 
 function criar(req, res) {

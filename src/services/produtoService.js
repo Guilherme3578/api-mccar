@@ -2,6 +2,7 @@ const produtoRepository = require('../repositories/produtoRepository');
 const especificacaoProdutoRepository = require('../repositories/especificacaoProdutoRepository');
 const produtoVeiculoRepository = require('../repositories/produtoVeiculoRepository');
 const categoriaService = require('./categoriaService');
+const OrdenacaoProduto = require('../enums/OrdenacaoProduto');
 const AppError = require('../utils/AppError');
 const {
   exigirCampos,
@@ -12,6 +13,7 @@ const {
   paraFlag,
   paraFlagOpcional,
   paraTextoOpcional,
+  paraOpcao,
 } = require('../utils/validacao');
 
 const camposEditaveis = [
@@ -76,6 +78,7 @@ function listar(filtros) {
     destaque: paraFlagOpcional(filtros.destaque),
     ativo: paraFlagOpcional(filtros.ativo),
     busca: paraTextoOpcional(filtros.busca),
+    ordenar: paraTextoOpcional(filtros.ordenar) ? paraOpcao(filtros.ordenar, OrdenacaoProduto, 'ordenar') : OrdenacaoProduto.RELEVANCIA,
   });
 }
 

@@ -15,7 +15,7 @@ function validarAmbiente() {
     erros.push('PORT deve ser um número');
   }
 
-  for (const nome of ['FRETE_PADRAO_CENTAVOS', 'FRETE_TRANSPORTE_MIN_DIAS', 'FRETE_TRANSPORTE_MAX_DIAS']) {
+  for (const nome of ['FRETE_PADRAO_CENTAVOS', 'FRETE_GRATIS_ACIMA_CENTAVOS', 'FRETE_TRANSPORTE_MIN_DIAS', 'FRETE_TRANSPORTE_MAX_DIAS']) {
     const valor = process.env[nome];
     if (valor && (!Number.isInteger(Number(valor)) || Number(valor) < 0)) {
       erros.push(`${nome} deve ser um número inteiro maior ou igual a 0`);
@@ -26,6 +26,11 @@ function validarAmbiente() {
   const maximo = Number(process.env.FRETE_TRANSPORTE_MAX_DIAS || 7);
   if (minimo > maximo) {
     erros.push('FRETE_TRANSPORTE_MIN_DIAS não pode ser maior que FRETE_TRANSPORTE_MAX_DIAS');
+  }
+
+  const aprovacao = process.env.PAGAMENTO_APROVACAO_AUTOMATICA;
+  if (aprovacao && !['true', 'false'].includes(aprovacao)) {
+    erros.push('PAGAMENTO_APROVACAO_AUTOMATICA deve ser true ou false');
   }
 
   if (erros.length > 0) {

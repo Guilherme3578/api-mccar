@@ -27,13 +27,12 @@ const TRANSICOES = Object.freeze({
 
 const STATUS_ALTERAVEIS_PELO_CLIENTE = [StatusPedido.RASCUNHO, StatusPedido.AGUARDANDO_PAGAMENTO];
 
-function formatarReais(centavos) {
-  return (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
 function gerarNumero() {
-  const data = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `MC${data}${crypto.randomInt(100000, 1000000)}`;
+  let numero;
+  do {
+    numero = `MC-${crypto.randomInt(10000, 100000)}`;
+  } while (pedidoRepository.buscarPorNumero(numero));
+  return numero;
 }
 
 function dadosDeEntrega(idEndereco, idUsuario) {
@@ -54,10 +53,10 @@ function dadosDeEntrega(idEndereco, idUsuario) {
   };
 }
 
-function cupomValidado(idCupom) {
+function cupomValidado(idCupom, idUsuario, idPedido) {
   const id = paraIdOpcional(idCupom, 'id_cupom');
   if (id) {
-    cupomService.validarParaUso(id);
+    cupomService.validarParaUso(id, idUsuario, idPedido);
   }
   return id;
 }
@@ -81,7 +80,7 @@ function aplicarTotais(pedido) {
   const resumo = itemPedidoRepository.resumo(pedido.id_pedido);
   const cupom = pedido.id_cupom ? cupomRepository.buscarPorId(pedido.id_cupom) : null;
   const desconto_centavos = cupomService.calcularDesconto(cupom, resumo.subtotal_centavos);
-  const envio = freteService.calcular(resumo);
+  const envio = freteService.calcular(resumo, desconto_centavos);
 
   return {
     ...pedido,
@@ -98,13 +97,8 @@ function validarFinalizacao(pedido) {
   }
 
   if (pedido.id_cupom) {
-    const cupom = cupomService.validarParaUso(pedido.id_cupom);
-    if (pedido.subtotal_centavos < cupom.minimo_compra_centavos) {
-      throw new AppError(
-        `O cupom ${cupom.codigo} exige compra mínima de ${formatarReais(cupom.minimo_compra_centavos)}`,
-        400
-      );
-    }
+    const cupom = cupomService.validarParaUso(pedido.id_cupom, pedido.id_usuario, pedido.id_pedido);
+    cupomService.garantirCompraMinima(cupom, pedido.subtotal_centavos);
   }
 }
 
@@ -180,7 +174,7 @@ function novoPedido(idUsuario, idEndereco, idCupom) {
 function criar(usuarioLogado, dados) {
   exigirCampos(dados, ['id_endereco']);
   const idEndereco = paraId(dados.id_endereco, 'id_endereco');
-  const idCupom = cupomValidado(dados.id_cupom);
+  const idCupom = cupomValidado(dados.id_cupom, usuarioLogado.id_usuario);
 
   return transacao(() => {
     const pedido = novoPedido(usuarioLogado.id_usuario, idEndereco, idCupom);
@@ -191,7 +185,7 @@ function criar(usuarioLogado, dados) {
 function checkout(usuarioLogado, dados) {
   exigirCampos(dados, ['id_endereco']);
   const idEndereco = paraId(dados.id_endereco, 'id_endereco');
-  const idCupom = cupomValidado(dados.id_cupom);
+  const idCupom = cupomValidado(dados.id_cupom, usuarioLogado.id_usuario);
 
   const carrinho = carrinhoRepository.buscarPorUsuario(usuarioLogado.id_usuario);
   const itensDoCarrinho = carrinho ? itemCarrinhoRepository.listar(carrinho.id_carrinho) : [];
@@ -233,7 +227,7 @@ function atualizar(usuarioLogado, id, dados) {
     Object.assign(pedido, dadosDeEntrega(paraId(alteracoes.id_endereco, 'id_endereco'), atual.id_usuario));
   }
   if (alteracoes.id_cupom !== undefined) {
-    pedido.id_cupom = cupomValidado(alteracoes.id_cupom);
+    pedido.id_cupom = cupomValidado(alteracoes.id_cupom, atual.id_usuario, id);
   }
   if (atual.status === StatusPedido.RASCUNHO) {
     pedido = aplicarTotais(pedido);
