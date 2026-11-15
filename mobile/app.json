@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "MCCAR",
+    "slug": "mccar-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
+  }
+}
