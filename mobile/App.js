@@ -19,7 +19,7 @@ import { restaurarSessao, sair } from './services/auth';
 import { meuCarrinho, adicionarAoCarrinho } from './services/shop';
 import { listarVeiculos, listarFavoritos, favoritar, desfavoritar } from './services/account';
 
-const ABAS = ['home', 'catalog', 'cart', 'profile'];
+const ABAS = ['home','catalog','cart', 'profile'];
 
 export default function App() {
   const [carregando, setCarregando] = useState(true);
