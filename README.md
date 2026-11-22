@@ -32,7 +32,11 @@ Pode rodar de novo quando quiser: ele não sobrescreve um `.env` que já existe 
 | `npm start` | Sobe a API sem recarregar |
 | `npm run seed` | Preenche só o catálogo de exemplo |
 | `npm run admin -- email@exemplo.com` | Transforma um usuário já cadastrado em ADMIN |
-| `npm test` | Roda os testes automatizados |
+| `npm test` | Roda todos os testes (unitários e de API). Detalhes no `RELATORIO_TESTES.md` |
+| `npm run test:unidade` | Só os testes unitários: cada regra testada direto, sem servidor |
+| `npm run test:api` | Só os testes de API: o servidor sobe e recebe requisições como o app faria |
+| `npm run test:cobertura` | Todos os testes, com o relatório de cobertura do código no final |
+| `npm run test:mercadopago` | Teste com o Mercado Pago de verdade (precisa do `MP_ACCESS_TOKEN` de teste no `.env`; sem ele, o teste é pulado) |
 
 ### Acessando pelo celular (Expo)
 
@@ -57,7 +61,8 @@ Pare a API (Ctrl+C), apague a pasta `data/` e rode `npm run seed` de novo.
 | `Cannot find module ...` | Rode `npm install` |
 | `EADDRINUSE` (porta em uso) | A API já está rodando em outro terminal, ou troque o `PORT` no `.env` |
 | O celular não conecta | Use o IP da rede (não `localhost`), confira se estão no mesmo Wi-Fi e se o firewall do Windows liberou o Node |
-| Datas antigas sem o `Z` no final | Banco criado antes de 01/11/2026: apague a pasta `data/` e rode `npm run seed` |
+| `O banco ... foi criado com uma versão antiga do schema` | Apague a pasta `data/` e rode `npm run setup` |
+| `Mercado Pago não configurado` (503) | Coloque o `MP_ACCESS_TOKEN` no `.env` e reinicie a API |
 
 ---
 
@@ -140,6 +145,74 @@ O app **nunca** envia o número completo nem o CVV: só a bandeira, os 4 último
 - `salvar_cartao: true` guarda o cartão em `/cartoes` para as próximas compras. Com `false`, ou sem o campo, ele só fica registrado no pagamento.
 - Para pagar com um cartão já salvo: `{ "id_pedido": 7, "metodo": "CARTAO", "id_cartao": 3 }`.
 - PIX e boleto: `{ "id_pedido": 7, "metodo": "PIX" }`.
+
+---
+
+## Mercado Pago (Checkout Pro)
+
+O pagamento de verdade acontece na página do **Mercado Pago**: o app abre o link e o cliente paga com cartão, PIX, boleto ou saldo. **O app nunca recebe dados de cartão.**
+
+### Fluxo no app
+```
+1. POST /pedidos/checkout                   { id_endereco, id_cupom? }   → id_pedido
+2. POST /pagamentos/mercado-pago            { id_pedido }                → checkout_url
+3. Abrir checkout_url no navegador          (expo-web-browser)
+4. Quando o navegador fechar:
+   POST /pagamentos/mercado-pago/sincronizar { id_pedido }               → status_pedido
+5. status_pedido "PAGO" → tela de confirmação
+```
+
+No Expo:
+
+```js
+import * as WebBrowser from 'expo-web-browser';
+
+const { checkout_url } = await api.post('/pagamentos/mercado-pago', { id_pedido });
+await WebBrowser.openBrowserAsync(checkout_url);
+const { status_pedido, pagamento } = await api.post('/pagamentos/mercado-pago/sincronizar', { id_pedido });
+```
+
+| Rota | Acesso | O que faz |
+|---|---|---|
+| `POST /pagamentos/mercado-pago` | 🔑 | Cria a cobrança no Mercado Pago e devolve `{ pagamento, checkout_url }`. Pode ser chamada de novo para gerar outro link enquanto estiver pendente |
+| `POST /pagamentos/mercado-pago/sincronizar` | 🔑 | Consulta o Mercado Pago e atualiza o pagamento e o pedido. Devolve `{ pagamento, status_pedido }` |
+| `POST /pagamentos/mercado-pago/webhook` | 🌐 | Chamada pelo próprio Mercado Pago a cada mudança. Valida a assinatura quando `MP_WEBHOOK_SECRET` está configurado |
+
+- O valor cobrado é o **total do pedido** calculado pela API (produtos, cupom e frete), nunca um valor enviado pelo app.
+- Quando o pagamento é aprovado, o `metodo` do pagamento passa de `MERCADO_PAGO` para o que o cliente usou (`CARTAO`, `PIX` ou `BOLETO`), e o pedido vira `PAGO`.
+- Se o Mercado Pago informar um valor pago **menor** que o pedido, a API não aprova.
+- Um estorno feito no Mercado Pago cancela o pedido.
+
+### Configurar
+1. Crie uma conta em https://www.mercadopago.com.br/developers e uma **aplicação** em "Suas integrações".
+2. Copie o **Access Token de teste** em "Credenciais de teste" e coloque no `.env`:
+   ```
+   MP_ACCESS_TOKEN=APP_USR-...
+   ```
+3. Crie um **comprador de teste**: no painel (com o seletor em "Teste"), vá em **Contas de teste → Criar nova conta**, tipo **Comprador**, país Brasil. Guarde o usuário, a senha e o código de 6 dígitos. Com credenciais de teste, nenhum dinheiro de verdade é cobrado.
+
+| Variável | Obrigatória | Para que serve |
+|---|---|---|
+| `MP_ACCESS_TOKEN` | sim, para usar o Mercado Pago | Credencial da aplicação. Sem ela, as rotas respondem 503 com uma mensagem explicando |
+| `MP_URL_PUBLICA` | não | Endereço público da API (ex.: `https://xxxx.ngrok-free.app`) para o Mercado Pago chamar o webhook. Sem ela, o app usa o `/sincronizar` |
+| `MP_WEBHOOK_SECRET` | não | "Assinatura secreta" de Webhooks em "Suas integrações". Com ela, notificações falsas são recusadas com 401 |
+| `MP_URL_RETORNO` | não | Link de volta ao app depois do pagamento (deep link do Expo). Não pode ser `localhost` |
+
+### Testar com o Mercado Pago de verdade
+1. Coloque o Access Token **de teste** no `MP_ACCESS_TOKEN` do `.env`.
+2. Rode `npm run test:mercadopago`. O teste cria pedidos, gera as cobranças no Mercado Pago, confere lá se o valor, os itens e o frete estão certos, e mostra no final um link de checkout.
+3. Para testar o pagamento até o fim: suba a API (`npm run dev`) e use a pasta **Mercado Pago** do Postman ("Abrir checkout"). Abra o `checkout_url` numa **janela anônima, logado com o comprador de teste**, pague com o cartão de teste abaixo e rode "Sincronizar pagamento". O pedido deve ficar `PAGO`.
+
+| Campo | Valor (cartão de teste oficial) |
+|---|---|
+| Mastercard | `5480 8328 0103 3311` |
+| Validade / CVV | `11/30` / `123` |
+| Nome do titular | `APRO` (aprovado) ou `OTHE` (recusado) |
+| CPF | `12345678909` |
+
+> Se aparecer "Uma das partes com as quais você está tentando efetuar o pagamento é de teste", você não está logado com o comprador de teste.
+
+> O webhook precisa de um endereço público, porque o Mercado Pago não alcança o `localhost` do seu PC. Para a apresentação, o `/sincronizar` resolve sem isso.
 
 ---
 
@@ -279,10 +352,13 @@ src/
   guards/        autenticação, admin, limite de login e tratamento de erros
   controllers/   recebem a requisição e devolvem a resposta
   services/      regras de negócio
+  integracoes/   comunicação com serviços externos (Mercado Pago)
   repositories/  acesso ao banco
   database/      schema.sql, seed.sql e uma query .sql por arquivo
   enums/         status, métodos de pagamento, perfis
   config/        banco, ambiente, frete
-tests/           testes automatizados (npm test)
+tests/
+  unidade/       testes unitários: funções, guards, regras e Mercado Pago (simulado)
+  api/           testes de API: requisições HTTP de ponta a ponta
 postman/         collection para importar no Postman
 ```

@@ -71,6 +71,9 @@ function criar(usuarioLogado, dados) {
   exigirCampos(dados, ['id_pedido', 'metodo']);
   const pedido = pedidoService.buscar(usuarioLogado, paraId(dados.id_pedido, 'id_pedido'));
   const metodo = paraOpcao(dados.metodo, MetodoPagamento, 'metodo');
+  if (metodo === MetodoPagamento.MERCADO_PAGO) {
+    throw new AppError('Para pagar pelo Mercado Pago use POST /pagamentos/mercado-pago', 400);
+  }
 
   if (pedido.status !== StatusPedido.AGUARDANDO_PAGAMENTO) {
     throw new AppError('O pedido precisa estar com status AGUARDANDO_PAGAMENTO', 400);

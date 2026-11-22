@@ -2,7 +2,7 @@
 
 **Projeto Integrador · SENAC 4º semestre · Desenvolvimento Mobile**
 **Responsável pelo backend:** Guilherme Israel dos Santos
-**Última atualização:** 01/11/2026
+**Última atualização:** 22/11/2026
 
 ---
 
@@ -38,8 +38,8 @@ api-mccar/
 ├── package.json
 ├── README.md                  guia para a equipe do front
 ├── data/mccar.db              banco SQLite (criado automaticamente, fora do git)
-├── postman/                   collection do Postman (82 requisições)
-├── tests/                     7 baterias de testes automatizados + apoio.js
+├── postman/                   collection do Postman (85 requisições)
+├── tests/                     unidade/ (6 arquivos de testes unitários) e api/ (8 baterias de testes de API)
 └── src/
     ├── server.js              valida o .env e sobe o servidor (mostra o IP para o Expo)
     ├── app.js                 express, cors, json, rotas, 404 e tratamento de erros
@@ -60,7 +60,8 @@ api-mccar/
     │   └── errorHandler.js    converte erros em respostas JSON padronizadas
     ├── routes/                routes.js (agregador) + 1 arquivo por entidade
     ├── controllers/           16 controllers (só req/res)
-    ├── services/              17 services (regras de negócio) + freteService
+    ├── services/              18 services (regras de negócio), incluindo freteService e mercadoPagoService
+    ├── integracoes/mercadoPago.js  único arquivo que usa o SDK do Mercado Pago
     ├── repositories/          16 repositories (só executam as queries)
     ├── scripts/
     │   ├── promoverAdmin.js   transforma um usuário em ADMIN
@@ -98,6 +99,10 @@ Qualquer erro em qualquer camada → errorHandler → { "erro": "mensagem" } com
 | Tabela | Campo novo | Motivo |
 |---|---|---|
 | `usuario` | `perfil TEXT` (`CLIENTE` / `ADMIN`, padrão `CLIENTE`) | Controle de acesso de administrador (item S2) |
+| `pagamento` | `mp_preferencia_id TEXT`, `mp_pagamento_id TEXT` | Ligar o pagamento à cobrança e ao pagamento no Mercado Pago (Fase 8) |
+| `pagamento` | valor `MERCADO_PAGO` em `metodo` | Pagamento aberto no Mercado Pago, antes de o cliente escolher a forma |
+
+O banco guarda a versão do schema (`PRAGMA user_version`, hoje 2). Um banco criado com uma versão antiga não sobe: a API avisa para apagar a pasta `data/` e rodar `npm run setup`.
 
 > **Ação:** atualizar o diagrama da equipe com esse campo.
 
@@ -122,7 +127,7 @@ Qualquer erro em qualquer camada → errorHandler → { "erro": "mensagem" } com
 | `npm start` | Sobe sem recarregar |
 | `npm run admin -- <email>` | Promove o usuário a ADMIN |
 | `npm run seed` | Preenche o catálogo de exemplo, sem duplicar se rodar de novo |
-| `npm test` | Roda as 7 baterias de testes, cada uma num banco temporário |
+| `npm test` | Roda os testes unitários e os de API (`test:unidade` e `test:api` rodam cada tipo separado) |
 
 ### Variáveis do `.env`
 | Variável | Obrigatória | Padrão | Uso |
@@ -136,6 +141,10 @@ Qualquer erro em qualquer camada → errorHandler → { "erro": "mensagem" } com
 | `FRETE_TRANSPORTE_MIN_DIAS` | não | 2 | Prazo mínimo de transporte |
 | `FRETE_TRANSPORTE_MAX_DIAS` | não | 7 | Prazo máximo de transporte |
 | `PAGAMENTO_APROVACAO_AUTOMATICA` | não | `false` | `true` aprova PIX e cartão na hora (simula o gateway, usado na demonstração). Boleto sempre espera o admin |
+| `MP_ACCESS_TOKEN` | para o Mercado Pago | — | Access Token da aplicação no Mercado Pago (use o de teste) |
+| `MP_URL_PUBLICA` | não | — | Endereço público da API, para o webhook (ex.: ngrok) |
+| `MP_WEBHOOK_SECRET` | não | — | Assinatura secreta dos webhooks, para recusar notificações falsas |
+| `MP_URL_RETORNO` | não | — | Deep link de volta ao app depois do pagamento (não pode ser localhost) |
 
 > Por que não tem usuário e senha do banco? O SQLite não é um servidor: é um arquivo. Basta o caminho (`DB_PATH`). Já o `JWT_SECRET` é a chave que assina os tokens de login. Quem conhece essa chave consegue se passar por qualquer usuário, por isso ela fica só no `.env`.
 
@@ -233,6 +242,9 @@ O app deve usar o endereço da rede, com o PC e o celular no mesmo Wi-Fi.
 | GET | `/pagamentos`, `/pagamentos/:id` | 🔑 | |
 | PUT | `/pagamentos/:id` | 👑 | `{ status }` |
 | DELETE | `/pagamentos/:id` | 👑 | Só `PENDENTE` ou `RECUSADO` |
+| POST | `/pagamentos/mercado-pago` | 🔑 | `{ id_pedido }`. Cria a cobrança no Mercado Pago e devolve `checkout_url` |
+| POST | `/pagamentos/mercado-pago/sincronizar` | 🔑 | `{ id_pedido }`. Consulta o Mercado Pago e devolve `{ pagamento, status_pedido }` |
+| POST | `/pagamentos/mercado-pago/webhook` | 🌐 | Notificação do Mercado Pago (assinatura validada com `MP_WEBHOOK_SECRET`) |
 
 ### Utilitária
 `GET /` devolve `{ api: "MCCAR", status: "online" }`, que serve para o front testar a conexão.
@@ -372,7 +384,48 @@ As 10 telas do Figma foram comparadas com a API. Login, Cadastro, Home, Produto,
 
 A regra de compra mínima do cupom passou para o `cupomService` (`garantirCompraMinima`), e agora o carrinho e o pedido usam a mesma verificação.
 
-### Testes automatizados (`npm test`)
+### Fase 8: integração com o Mercado Pago ✅
+Requisito do professor: "aplicativo móvel para gerenciar o e-commerce, com carrinho de compras e integrado a API do Mercado Pago".
+
+**Escolha: Checkout Pro**, com o SDK oficial `mercadopago` 3.6.1. A API cria a cobrança e o cliente paga na página do Mercado Pago, aberta pelo app. Assim o app nunca recebe dados de cartão, e cartão, PIX, boleto e saldo funcionam sem código extra.
+
+| Peça | O que faz |
+|---|---|
+| `src/integracoes/mercadoPago.js` | Único arquivo que conhece o SDK. Cria a preferência, busca pagamentos e valida a assinatura do webhook (validador oficial do SDK, HMAC-SHA256). Traduz erros do Mercado Pago em mensagens claras (503 sem credencial ou com credencial inválida, 502 se o Mercado Pago estiver fora) |
+| `src/services/mercadoPagoService.js` | Regras: monta a cobrança a partir do pedido, traduz status e forma de pagamento, aplica o resultado no pagamento e no pedido |
+| `POST /pagamentos/mercado-pago` | Cria a cobrança e devolve `checkout_url` |
+| `POST /pagamentos/mercado-pago/sincronizar` | O app chama ao voltar do checkout; a API consulta o Mercado Pago e atualiza o pedido. Funciona sem endereço público |
+| `POST /pagamentos/mercado-pago/webhook` | O Mercado Pago avisa a API a cada mudança (precisa de endereço público, como o ngrok) |
+
+**Regras de segurança da integração:**
+- O valor cobrado é sempre o total calculado pela API. O teste confirma que a soma dos itens enviados ao Mercado Pago é igual ao total do pedido e ao resumo do carrinho.
+- A API nunca confia no corpo do webhook: ela busca o pagamento direto no Mercado Pago pelo id.
+- Com `MP_WEBHOOK_SECRET`, notificações sem assinatura válida são recusadas (401), com tolerância de 5 minutos no horário.
+- Pagamento aprovado com valor menor que o pedido não aprova o pedido.
+- Notificação repetida não muda o resultado, e uma notificação atrasada de uma tentativa recusada não desfaz uma aprovação.
+- Recusado e depois aprovado no mesmo checkout termina `PAGO`. Estorno no Mercado Pago cancela o pedido.
+
+**Testado sem credencial:** nos testes, a integração é substituída por uma versão falsa, então tudo roda sem internet. Também foi feita uma chamada real à API do Mercado Pago com um token inválido: o Mercado Pago respondeu e a API devolveu a mensagem de credencial inválida. **Testado com o Mercado Pago real em 22/11/2026:** o teste automático (`npm run test:mercadopago`) passou, e uma compra de teste paga com cartão (pedido MC-45445, R$ 189,70) terminou com o pedido `PAGO` e o pagamento `APROVADO` / `CARTAO` / final 3311. Detalhes na seção 8 do `RELATORIO_TESTES.md`.
+
+O pagamento simulado (`POST /pagamentos` com `PAGAMENTO_APROVACAO_AUTOMATICA`) continua existindo, como alternativa para o vídeo caso a internet falhe.
+
+### Fase 9: testes unitários ✅
+Até aqui, todos os testes eram **de API** (requisições HTTP com o servidor no ar). Agora há também **testes unitários**: cada função, guard e regra testados direto, sem servidor. Os testes ficaram em duas pastas, `tests/unidade/` e `tests/api/`.
+
+Para provar que os testes pegam erros, três regras foram sabotadas de propósito e os testes acusaram as três: o frete grátis "a partir de" virou "acima de"; a verificação do valor pago pelo Mercado Pago foi desligada; e o `paraId` passou a aceitar `0` e `01`. Depois, o código foi restaurado.
+
+### Testes unitários (`npm run test:unidade`)
+| Arquivo | O que testa | Testes |
+|---|---|---|
+| `validacao.test.js` | Campos obrigatórios, ids (incluindo `0x10`, `1e1`, `01`), inteiros, flags, enums | 29 |
+| `acesso.test.js` | Admin, dono do dado, filtro por usuário | 6 |
+| `calculos.test.js` | Frete (limite de R$ 100, desconto, arredondamento do prazo) e desconto do cupom (percentual, valor fixo, teto, mínimo) | 14 |
+| `guards.test.js` | `authGuard` (token ausente, errado, expirado, `alg: none`, usuário excluído), `adminGuard`, limite de login (bloqueio, Retry-After, maiúsculas, reset) e `errorHandler` | 19 |
+| `regras.test.js` | Cadastro e login, checkout igual ao resumo, transições de pedido e pagamento, estorno, cartão sem número completo, `carregarQueries` | 18 |
+| `mercadoPago.test.js` | Tradução de status e métodos, montagem da cobrança, checkout, webhook com assinatura, sincronização, sem credencial | 24 |
+| **Total** | | **110** |
+
+### Testes de API (`npm run test:api`)
 | Bateria | Arquivo | Verificações | Resultado |
 |---|---|---|---|
 | CRUDs de todas as entidades | `crud.test.js` | 58 | ✅ |
@@ -382,9 +435,10 @@ A regra de compra mínima do cupom passou para o `cupomService` (`garantirCompra
 | Rotas sem conflito, ids malformados, datas ISO | `rotas.test.js` | 37 | ✅ |
 | Aprovação automática do pagamento | `pagamentoAutomatico.test.js` | 18 | ✅ |
 | Telas do Figma (carrinho, checkout, pagamento, listagem, pedidos) | `telas.test.js` | 50 | ✅ |
-| **Total** | | **359** | ✅ |
+| Rotas do Mercado Pago (login, sem credencial, webhook público) | `mercadoPago.test.js` | 16 | ✅ |
+| **Total** | | **375** | ✅ |
 
-Para confirmar que os testes detectam erros de verdade, a regra de frete foi alterada de propósito: as baterias de regras e de cupom falharam e apontaram a verificação exata.
+Para confirmar que os testes de API também detectam erros, a regra de frete foi alterada de propósito: as baterias de regras e de cupom falharam e apontaram a verificação exata.
 
 ### Conflitos de rotas
 Nenhum. As rotas fixas (`/usuarios/me`, `/usuarios/login`, `/carrinhos/meu`, `/cupons/codigo/:codigo`, `/pedidos/checkout`, `/usuarios/:id/perfil`) são registradas antes das genéricas `/:id`. As rotas aninhadas (`/produtos/:idProduto/...`, `/carrinhos/:idCarrinho/itens`, `/pedidos/:idPedido/itens`, `/usuarios/:idUsuario/favoritos`) são registradas antes da rota pai e recebem o id dela (`mergeParams`). A bateria `rotas.test.js` cobre esses casos.
@@ -459,9 +513,10 @@ Nenhum. As rotas fixas (`/usuarios/me`, `/usuarios/login`, `/carrinhos/meu`, `/c
 
 1. ~~Cupom limitado a 1 uso por usuário~~ ✅ decidido e implementado, com o cupom de boas-vindas.
 2. ~~Regra de frete grátis~~ ✅ decidido: grátis a partir de R$ 100.
-3. **Atualizar o DER** com o campo `usuario.perfil`.
-4. **B4 (inativar em vez de excluir) e B5 (busca sem acento)** mudam o DER. Aprovar ou não.
-5. **Próximo passo sugerido:** o que sobrou do backlog é melhoria e não bloqueia a entrega. Se o DER for mudar (B4/B5), fazer antes o B2 (migrations).
+3. **Atualizar o DER** com o campo `usuario.perfil` e, na tabela `pagamento`, os campos `mp_preferencia_id` e `mp_pagamento_id` e o método `MERCADO_PAGO`.
+4. ~~Conta de desenvolvedor do Mercado Pago~~ ✅ criada; integração testada com a credencial de teste em 22/11/2026.
+5. **B4 (inativar em vez de excluir) e B5 (busca sem acento)** mudam o DER. Aprovar ou não.
+6. **Próximo passo sugerido:** o que sobrou do backlog é melhoria e não bloqueia a entrega. Se o DER for mudar (B4/B5), fazer antes o B2 (migrations).
 
 ---
 

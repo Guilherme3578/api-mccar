@@ -149,11 +149,13 @@ CREATE TABLE IF NOT EXISTS pagamento (
     id_pedido        INTEGER NOT NULL UNIQUE REFERENCES pedido (id_pedido),
     id_usuario       INTEGER NOT NULL REFERENCES usuario (id_usuario),
     id_cartao        INTEGER REFERENCES cartao_salvo (id_cartao) ON DELETE SET NULL,
-    metodo           TEXT    NOT NULL CHECK (metodo IN ('CARTAO', 'PIX', 'BOLETO')),
+    metodo           TEXT    NOT NULL CHECK (metodo IN ('CARTAO', 'PIX', 'BOLETO', 'MERCADO_PAGO')),
     status           TEXT    NOT NULL DEFAULT 'PENDENTE' CHECK (status IN ('PENDENTE', 'APROVADO', 'RECUSADO', 'ESTORNADO')),
     valor_centavos   INTEGER NOT NULL,
     cartao_bandeira  TEXT,
     cartao_final     TEXT,
+    mp_preferencia_id  TEXT,
+    mp_pagamento_id    TEXT,
     criado_em        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     aprovado_em      TEXT
 );

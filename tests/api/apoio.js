@@ -12,11 +12,11 @@ process.env.FRETE_TRANSPORTE_MIN_DIAS = '2';
 process.env.FRETE_TRANSPORTE_MAX_DIAS = '7';
 process.env.PAGAMENTO_APROVACAO_AUTOMATICA ??= 'false';
 
-const app = require('../src/app');
-const { db } = require('../src/config/database');
-const usuarioRepository = require('../src/repositories/usuarioRepository');
-const cupomService = require('../src/services/cupomService');
-const Perfil = require('../src/enums/Perfil');
+const app = require('../../src/app');
+const { db } = require('../../src/config/database');
+const usuarioRepository = require('../../src/repositories/usuarioRepository');
+const cupomService = require('../../src/services/cupomService');
+const Perfil = require('../../src/enums/Perfil');
 
 cupomService.garantirCupomBoasVindas();
 
@@ -82,7 +82,7 @@ function promoverAdmin(email) {
 }
 
 function rodarSeed() {
-  db.exec(fs.readFileSync(path.join(__dirname, '..', 'src', 'database', 'seed.sql'), 'utf8'));
+  db.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'database', 'seed.sql'), 'utf8'));
 }
 
 function finalizar() {

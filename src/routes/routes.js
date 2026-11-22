@@ -16,6 +16,7 @@ const cupomRoutes = require('./cupomRoutes');
 const pedidoRoutes = require('./pedidoRoutes');
 const itemPedidoRoutes = require('./itemPedidoRoutes');
 const pagamentoRoutes = require('./pagamentoRoutes');
+const mercadoPagoRoutes = require('./mercadoPagoRoutes');
 
 const router = Router();
 
@@ -38,6 +39,7 @@ router.use('/carrinhos', carrinhoRoutes);
 router.use('/cupons', cupomRoutes);
 router.use('/pedidos/:idPedido/itens', itemPedidoRoutes);
 router.use('/pedidos', pedidoRoutes);
+router.use('/pagamentos/mercado-pago', mercadoPagoRoutes);
 router.use('/pagamentos', pagamentoRoutes);
 
 module.exports = router;
