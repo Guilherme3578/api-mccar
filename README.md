@@ -31,6 +31,8 @@ Pode rodar de novo quando quiser: ele não sobrescreve um `.env` que já existe 
 | `npm run dev` | Sobe a API e recarrega ao salvar `.js` ou `.sql` |
 | `npm start` | Sobe a API sem recarregar |
 | `npm run seed` | Preenche só o catálogo de exemplo |
+| `npm run seed:vendas` | Cria 30 clientes e 140 pedidos de demonstração nos últimos 60 dias, para o dashboard ter dados |
+| `npm run zip` | Gera o `MCCAR-projeto.zip` da entrega a partir do último commit, sem `.env`, banco e `node_modules` |
 | `npm run admin -- email@exemplo.com` | Transforma um usuário já cadastrado em ADMIN |
 | `npm test` | Roda todos os testes (unitários e de API). Detalhes no `RELATORIO_TESTES.md` |
 | `npm run test:unidade` | Só os testes unitários: cada regra testada direto, sem servidor |
@@ -282,6 +284,37 @@ O primeiro cadastrado vira principal. Marcar outro como principal desmarca o ant
 | GET | `/cupons/codigo/:codigo` | 🔑 |
 | CRUD | `/cupons` | 👑 |
 
+### CEP (Correios, via ViaCEP) 🌐
+| Método | Rota | Observação |
+|---|---|---|
+| GET | `/cep/:cep` | Aceita com ou sem traço. Devolve `{ cep, logradouro, complemento, bairro, cidade, uf }`, já no formato do cadastro de endereço. CEP inexistente: 404; formato errado: 400; serviço fora do ar: 502 |
+
+### Relatório para o dashboard 👑
+| Método | Rota | Observação |
+|---|---|---|
+| GET | `/relatorios/dados` | Todos os dados de vendas em JSON: `resumo`, `vendas_por_dia`, `vendas_por_categoria`, `produtos_mais_vendidos`, `pedidos_por_status`, `pagamentos_por_metodo`, `vendas_por_estado`, `cupons` e a lista de `pedidos`. Valores em centavos |
+| GET | `/relatorios/dados?download=1` | O mesmo JSON como arquivo `mccar-dados-AAAA-MM-DD.json` |
+
+---
+
+## Dashboard (Python)
+
+Fica na pasta [`dashboard/`](dashboard/). Lê o JSON do relatório e mostra faturamento, pedidos, ticket médio, gráficos por dia, status, forma de pagamento, estado, categoria, produtos mais vendidos e cupons.
+
+```bash
+cd dashboard
+python -m venv .venv
+.venvScriptsactivate          # no Linux/Mac: source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+O dashboard abre no navegador. Na barra lateral, escolha a fonte dos dados:
+- **Arquivo JSON**: o arquivo gerado pelo app (ou baixado em `/relatorios/dados?download=1`). Sem arquivo, ele usa o `dados-exemplo.json`.
+- **API ao vivo**: endereço da API e login de um admin.
+
+Para ter vendas no banco: `npm run seed:vendas` (na raiz do projeto). Teste do dashboard: `python teste_dashboard.py`, dentro da pasta `dashboard` com o ambiente ativado.
+
 ---
 
 ## Regras que o app precisa saber
@@ -352,7 +385,7 @@ src/
   guards/        autenticação, admin, limite de login e tratamento de erros
   controllers/   recebem a requisição e devolvem a resposta
   services/      regras de negócio
-  integracoes/   comunicação com serviços externos (Mercado Pago)
+  integracoes/   comunicação com serviços externos (Mercado Pago e ViaCEP)
   repositories/  acesso ao banco
   database/      schema.sql, seed.sql e uma query .sql por arquivo
   enums/         status, métodos de pagamento, perfis
@@ -361,4 +394,5 @@ tests/
   unidade/       testes unitários: funções, guards, regras e Mercado Pago (simulado)
   api/           testes de API: requisições HTTP de ponta a ponta
 postman/         collection para importar no Postman
+dashboard/       dashboard de vendas em Python (Streamlit)
 ```

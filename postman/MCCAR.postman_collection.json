@@ -2088,6 +2088,94 @@
       ]
     },
     {
+      "name": "Relatórios e CEP",
+      "item": [
+        {
+          "name": "Buscar endereço pelo CEP",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cep/01001-000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cep",
+                "01001-000"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Consulta o ViaCEP (base dos Correios). Público. Use para preencher o formulário de endereço."
+          }
+        },
+        {
+          "name": "Dados para o dashboard (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/relatorios/dados",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "relatorios",
+                "dados"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Todos os dados de vendas em JSON, para o dashboard em Python. Só admin."
+          }
+        },
+        {
+          "name": "Baixar dados como arquivo (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/relatorios/dados?download=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "relatorios",
+                "dados"
+              ],
+              "query": [
+                {
+                  "key": "download",
+                  "value": "1"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Mesmo JSON, como arquivo mccar-dados-AAAA-MM-DD.json."
+          }
+        }
+      ]
+    },
+    {
       "name": "Admin",
       "item": [
         {

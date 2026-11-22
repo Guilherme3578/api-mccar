@@ -11,12 +11,13 @@
 
 | Indicador | Resultado |
 |---|---|
-| Testes de backend (unitários) | **110 testes, 110 aprovados** |
-| Testes de API (integração HTTP) | **8 baterias com 375 verificações, todas aprovadas** |
+| Testes de backend (unitários) | **121 testes, 121 aprovados** |
+| Testes de API (integração HTTP) | **9 baterias com 397 verificações, todas aprovadas** |
+| Teste do dashboard em Python | **6 verificações, todas aprovadas** |
 | Falhas | **0** |
 | Tempo total de execução | cerca de 3 segundos |
-| Cobertura de linhas do código (`src/`) | **91,4%** |
-| Cobertura de decisões (branches) | **91,7%** |
+| Cobertura de linhas do código (`src/`) | **91,7%** |
+| Cobertura de decisões (branches) | **91,2%** |
 | Mercado Pago real (credencial de teste) | **Teste automático aprovado e compra de teste paga de ponta a ponta** |
 
 Os testes são automatizados e reproduzíveis: qualquer pessoa da equipe roda tudo com um comando, sem servidor ligado, sem banco preparado e sem internet.
@@ -32,13 +33,13 @@ Os testes são automatizados e reproduzíveis: qualquer pessoa da equipe roda tu
 | **Exemplo** | `freteService.calcular(...)` com R$ 100 em produtos deve devolver frete 0 | `GET /carrinhos/meu` com R$ 100 no carrinho deve devolver `frete_centavos: 0` |
 | **Pasta** | `tests/unidade/` | `tests/api/` |
 | **Comando** | `npm run test:unidade` | `npm run test:api` |
-| **Cobertura sozinho** | 79,7% das linhas | 87,6% das linhas |
+| **Cobertura sozinho** | 80,5% das linhas | 87,7% das linhas |
 
 Os dois tipos se completam:
 - O unitário testa casos difíceis de provocar por HTTP: token expirado, notificação falsa do Mercado Pago, arredondamento de centavos.
 - O de API confirma que as peças funcionam juntas: rotas, guards, controllers, services e banco.
 
-Somados, chegam a **91,4%** de cobertura.
+Somados, chegam a **91,7%** de cobertura.
 
 ---
 
@@ -69,7 +70,8 @@ tests/
 │   ├── calculos.test.js
 │   ├── guards.test.js
 │   ├── regras.test.js
-│   └── mercadoPago.test.js
+│   ├── mercadoPago.test.js
+│   └── relatorio.test.js
 └── api/
     ├── apoio.js                 sobe o servidor, faz as requisições e acumula as falhas
     ├── crud.test.js
@@ -79,7 +81,8 @@ tests/
     ├── rotas.test.js
     ├── pagamentoAutomatico.test.js
     ├── telas.test.js
-    └── mercadoPago.test.js
+    ├── mercadoPago.test.js
+    └── relatorio.test.js
 └── mercadopago/
     └── sandbox.test.js          Mercado Pago de verdade, com a credencial de teste (seção 8)
 ```
@@ -97,7 +100,7 @@ tests/
 
 ## 4. Testes de backend (unitários)
 
-**110 testes em 30 grupos, todos aprovados (cerca de 1,7 s).**
+**121 testes em 32 grupos, todos aprovados (cerca de 1,5 s).**
 
 | Arquivo | Parte do código | Testes | Resultado |
 |---|---|---|---|
@@ -107,7 +110,8 @@ tests/
 | `guards.test.js` | `guards/` (autenticação, admin, limite de login, erros) | 19 | ✅ |
 | `regras.test.js` | `usuarioService`, `pedidoService`, `pagamentoService`, `carrinhoService`, `carregarQueries` | 18 | ✅ |
 | `mercadoPago.test.js` | `services/mercadoPagoService.js` e `integracoes/mercadoPago.js` | 24 | ✅ |
-| **Total** | | **110** | ✅ |
+| `relatorio.test.js` | `services/relatorioService.js`, `services/cepService.js` e `integracoes/viaCep.js` | 11 | ✅ |
+| **Total** | | **121** | ✅ |
 
 ### 4.1 Validação de dados (`validacao.test.js`)
 | O que é verificado | Casos |
@@ -175,11 +179,20 @@ A integração real com o Mercado Pago fica isolada em `src/integracoes/mercadoP
 
 A assinatura do webhook é gerada no teste com o mesmo algoritmo do Mercado Pago (HMAC-SHA256) e conferida pelo **validador oficial do SDK**, e não por uma imitação.
 
+### 4.7 Relatório e CEP (`relatorio.test.js`)
+| Área | Casos verificados |
+|---|---|
+| Relatório vazio | Sem vendas, tudo zerado, ticket médio 0 (sem divisão por zero) e listas vazias |
+| O que conta como faturamento | Com um pedido pago, um enviado, um aguardando e um cancelado: **só pago e enviado entram no faturamento**; ticket médio, clientes que compraram e contagem por status corretos |
+| Consistência entre seções | Soma por categoria = soma por produto; soma por estado = soma por dia = faturamento do resumo; uso e desconto do cupom BEMVINDO50 corretos |
+| Lista de pedidos | Cada pedido traz método e status do pagamento, cupom, estado e quantidade de itens; rascunhos ficam de fora |
+| CEP | Aceita com ou sem traço; tamanho errado: 400 sem consultar o serviço; tradução dos campos do ViaCEP; inexistente: 404; ViaCEP fora do ar: 502 |
+
 ---
 
 ## 5. Testes de API (integração HTTP)
 
-**8 baterias com 375 verificações, todas aprovadas (cerca de 2,5 s).**
+**9 baterias com 397 verificações, todas aprovadas (cerca de 2,7 s).**
 
 Cada bateria sobe o servidor real, cria os próprios usuários e dados, e faz as requisições em sequência, como um usuário do app. Cada verificação confere o **status HTTP** e, quando importa, o **conteúdo da resposta**.
 
@@ -193,7 +206,8 @@ Cada bateria sobe o servidor real, cria os próprios usuários e dados, e faz as
 | Aprovação automática do pagamento | `pagamentoAutomatico.test.js` | 18 | ✅ |
 | Telas do Figma | `telas.test.js` | 50 | ✅ |
 | Rotas do Mercado Pago | `mercadoPago.test.js` | 16 | ✅ |
-| **Total** | | **375** | ✅ |
+| Relatório em JSON e CEP | `relatorio.test.js` | 22 | ✅ |
+| **Total** | | **397** | ✅ |
 
 ### 5.1 CRUDs (`crud.test.js`)
 Percorre todas as entidades: cadastro e login, endereços, cartões, modelos de veículo, veículos do usuário, categorias, produtos com especificações e compatibilidade, favoritos, carrinho, pedido, itens do pedido e pagamento. Também verifica:
@@ -265,6 +279,16 @@ Cada etapa reproduz o que uma tela do Figma precisa:
 - **Conflito de rotas:** as rotas do Mercado Pago não conflitam com `/pagamentos/:id`.
 - **Método:** `MERCADO_PAGO` não é aceito pelo pagamento simulado.
 
+### 5.9 Relatório em JSON e CEP (`relatorio.test.js`)
+- **Acesso:** sem login, 401; cliente, 403. Só o admin vê os dados da empresa.
+- **Venda real:** uma compra feita pela API (carrinho, checkout, PIX, aprovação) aparece no JSON: faturamento, produto mais vendido, estado de entrega e a linha do pedido com o método de pagamento.
+- **Estrutura:** o JSON tem todas as seções que o dashboard usa.
+- **Download:** com `?download=1`, a resposta vem como arquivo `mccar-dados-AAAA-MM-DD.json`.
+- **CEP:** a rota é pública, devolve rua, cidade e UF, e responde 404 para CEP inexistente e 400 para formato errado (o ViaCEP é simulado neste teste).
+
+### 5.10 Dashboard em Python (`dashboard/teste_dashboard.py`)
+Abre o dashboard sem navegador (`streamlit.testing`) com o `dados-exemplo.json` e confere: **abre sem erros**, faturamento, pedidos pagos e ticket médio **iguais aos calculados pela API**, os 6 gráficos e as 7 seções aparecem. Resultado: **6 de 6 aprovadas**. A busca de dados direto da API (login de admin) também foi testada: o admin recebe os dados, um cliente comum é barrado e senha errada ou API desligada mostram mensagem clara.
+
 ---
 
 ## 6. Os testes detectam erros de verdade?
@@ -276,6 +300,7 @@ Um teste só tem valor se falhar quando o código está errado. Para provar isso
 | Frete grátis "a partir de R$ 100" trocado por "acima de R$ 100" (`>=` por `>`) | ❌ Falharam os testes unitários "a partir de R$ 100 o frete é grátis" e "o desconto do cupom conta para o frete grátis" |
 | Verificação do valor pago no Mercado Pago desligada | ❌ Falhou o teste "pagamento com valor menor que o pedido não aprova" |
 | Validação de id passou a aceitar `0` e `01` | ❌ Falharam os testes "recusa 0" e "recusa 01" |
+| Pedidos "ENVIADO" retirados da conta do faturamento no relatório (`resumo.sql`) | ❌ Falharam os testes "só pedidos pagos, enviados ou entregues contam como faturamento" e "categorias, produtos, estados e cupons batem com os pedidos" |
 | Regra de frete alterada pelo `.env` (frete grátis só acima de R$ 9.999,99) | ❌ Baterias de API de regras e de cupom falharam, apontando a verificação exata |
 
 Em todos os casos os testes acusaram o problema e indicaram a regra quebrada.
@@ -288,9 +313,9 @@ Medida com `npm run test:cobertura` sobre a pasta `src/`:
 
 | Métrica | Unitários | API | **Todos juntos** |
 |---|---|---|---|
-| Linhas | 79,7% | 87,6% | **91,4%** |
-| Decisões (branches) | 83,2% | 88,4% | **91,7%** |
-| Funções | 62,8% | 80,8% | **83,0%** |
+| Linhas | 80,5% | 87,7% | **91,7%** |
+| Decisões (branches) | 82,9% | 88,0% | **91,2%** |
+| Funções | 64,8% | 81,4% | **83,7%** |
 
 ### Por camada
 | Camada | Linhas cobertas | Observação |
@@ -301,6 +326,7 @@ Medida com `npm run test:cobertura` sobre a pasta `src/`:
 | Enums e configuração | 86–100% | A parte não coberta é o aviso de banco antigo, testado manualmente |
 | Services de regras críticas | 94–100% | `freteService` 100%, `pedidoService` 97,6%, `mercadoPagoService` 97,2%, `pagamentoService` 96,4%, `usuarioService` 95,4% |
 | Repositories | 100% das linhas | |
+| Relatório e CEP | 91–100% | `relatorioService`, `relatorioRepository`, `cepService` e rotas: 100% das linhas. Em `viaCep.js`, só a resposta de erro HTTP do ViaCEP fica de fora |
 | Services de cadastro simples | 70–95% | Categorias, modelos de veículo e veículos: alguns caminhos de editar e excluir não são exercitados |
 | Controllers | 48–100% | Mesmo motivo: algumas rotas de editar e excluir de cadastros simples |
 | `integracoes/mercadoPago.js` | 68% | As chamadas reais ao Mercado Pago são simuladas nos testes (ver seção 8) |
@@ -339,9 +365,10 @@ Feita com a API rodando com o `.env` real, como o app faria:
 
 ## 9. Limitações e próximos passos
 
-1. **Webhook com endereço público:** a chegada de uma notificação real do Mercado Pago só pode ser testada com a API num endereço público (como o ngrok). A lógica do webhook está coberta pelos testes unitários, incluindo a assinatura.
-2. **Cadastros simples:** os caminhos de editar e excluir de categorias, modelos de veículo e veículos podem ganhar testes para elevar a cobertura das funções.
-3. **Limite de login:** o bloqueio fica na memória do servidor e zera quando a API reinicia. Isso é aceitável para o projeto, mas não para vários servidores em produção.
+1. **Testes E2E:** o roteiro pede testes unitários, de integração **e E2E**. Unitários e de integração estão feitos. O E2E (passar pelas telas do app, tocando nos botões, até o backend) depende do app finalizado pela equipe do front e ainda **não foi feito**.
+2. **Webhook com endereço público:** a chegada de uma notificação real do Mercado Pago só pode ser testada com a API num endereço público (como o ngrok). A lógica do webhook está coberta pelos testes unitários, incluindo a assinatura.
+3. **Cadastros simples:** os caminhos de editar e excluir de categorias, modelos de veículo e veículos podem ganhar testes para elevar a cobertura das funções.
+4. **Limite de login:** o bloqueio fica na memória do servidor e zera quando a API reinicia. Isso é aceitável para o projeto, mas não para vários servidores em produção.
 
 ---
 
@@ -354,6 +381,12 @@ npm run test:unidade      # só os de backend
 npm run test:api          # só os de API
 npm run test:cobertura    # todos, com a cobertura no final
 npm run test:mercadopago  # Mercado Pago de verdade (precisa do MP_ACCESS_TOKEN de teste)
+```
+
+Dashboard (dentro de `dashboard/`, com o ambiente Python ativado e `pip install -r requirements.txt`):
+
+```bash
+python teste_dashboard.py
 ```
 
 Não é preciso ligar o servidor, preparar o banco nem configurar o `.env`: os testes cuidam disso sozinhos e apagam o que criaram.

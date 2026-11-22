@@ -17,6 +17,8 @@ const pedidoRoutes = require('./pedidoRoutes');
 const itemPedidoRoutes = require('./itemPedidoRoutes');
 const pagamentoRoutes = require('./pagamentoRoutes');
 const mercadoPagoRoutes = require('./mercadoPagoRoutes');
+const relatorioRoutes = require('./relatorioRoutes');
+const cepRoutes = require('./cepRoutes');
 
 const router = Router();
 
@@ -41,5 +43,7 @@ router.use('/pedidos/:idPedido/itens', itemPedidoRoutes);
 router.use('/pedidos', pedidoRoutes);
 router.use('/pagamentos/mercado-pago', mercadoPagoRoutes);
 router.use('/pagamentos', pagamentoRoutes);
+router.use('/relatorios', relatorioRoutes);
+router.use('/cep', cepRoutes);
 
 module.exports = router;

@@ -38,8 +38,9 @@ api-mccar/
 ├── package.json
 ├── README.md                  guia para a equipe do front
 ├── data/mccar.db              banco SQLite (criado automaticamente, fora do git)
-├── postman/                   collection do Postman (85 requisições)
-├── tests/                     unidade/ (6 arquivos de testes unitários) e api/ (8 baterias de testes de API)
+├── postman/                   collection do Postman (88 requisições)
+├── dashboard/                 dashboard de vendas em Python (Streamlit)
+├── tests/                     unidade/ (7 arquivos de testes unitários), api/ (9 baterias de testes de API) e mercadopago/ (teste com o Mercado Pago real)
 └── src/
     ├── server.js              valida o .env e sobe o servidor (mostra o IP para o Expo)
     ├── app.js                 express, cors, json, rotas, 404 e tratamento de erros
@@ -61,7 +62,7 @@ api-mccar/
     ├── routes/                routes.js (agregador) + 1 arquivo por entidade
     ├── controllers/           16 controllers (só req/res)
     ├── services/              18 services (regras de negócio), incluindo freteService e mercadoPagoService
-    ├── integracoes/mercadoPago.js  único arquivo que usa o SDK do Mercado Pago
+    ├── integracoes/          mercadoPago.js (único arquivo que usa o SDK do Mercado Pago) e viaCep.js (CEP)
     ├── repositories/          16 repositories (só executam as queries)
     ├── scripts/
     │   ├── promoverAdmin.js   transforma um usuário em ADMIN
@@ -246,6 +247,12 @@ O app deve usar o endereço da rede, com o PC e o celular no mesmo Wi-Fi.
 | POST | `/pagamentos/mercado-pago/sincronizar` | 🔑 | `{ id_pedido }`. Consulta o Mercado Pago e devolve `{ pagamento, status_pedido }` |
 | POST | `/pagamentos/mercado-pago/webhook` | 🌐 | Notificação do Mercado Pago (assinatura validada com `MP_WEBHOOK_SECRET`) |
 
+### CEP e relatório
+| Método | Rota | Acesso | Observação |
+|---|---|---|---|
+| GET | `/cep/:cep` | 🌐 | Busca o endereço no ViaCEP (base dos Correios) |
+| GET | `/relatorios/dados` | 👑 | Dados de vendas em JSON para o dashboard; `?download=1` devolve como arquivo |
+
 ### Utilitária
 `GET /` devolve `{ api: "MCCAR", status: "online" }`, que serve para o front testar a conexão.
 
@@ -414,6 +421,18 @@ Até aqui, todos os testes eram **de API** (requisições HTTP com o servidor no
 
 Para provar que os testes pegam erros, três regras foram sabotadas de propósito e os testes acusaram as três: o frete grátis "a partir de" virou "acima de"; a verificação do valor pago pelo Mercado Pago foi desligada; e o `paraId` passou a aceitar `0` e `01`. Depois, o código foi restaurado.
 
+### Fase 10: itens de código da Sprint 2 do roteiro ✅
+Conferência do roteiro da segunda entrega ("Segunda entrega - Roteiro PI IV"), só na parte de código do backend:
+
+| Item do roteiro | Entrega |
+|---|---|
+| 2.1 CRUD e integração com API ("Ex. Correios") | Busca de CEP pelo **ViaCEP** (`GET /cep/:cep`), com a integração isolada em `src/integracoes/viaCep.js`. Testada com o serviço real: CEP da Sé e de Santo André corretos, CEP inexistente 404, formato errado 400 |
+| 2.2 Gerar dados em JSON | Rota `GET /relatorios/dados` (só admin) com resumo, vendas por dia, categoria, produto, status, forma de pagamento, estado, cupons e a lista de pedidos. Com `?download=1`, vem como arquivo. **O botão no app é do front** |
+| 2.5 Dashboard em Python | Pasta `dashboard/`: Streamlit + pandas + Plotly. Lê o JSON do app ou busca direto da API com login de admin. 5 indicadores, 6 gráficos, tabela de cupons e de pedidos com download em CSV, filtro por período |
+| Dados para o dashboard | `npm run seed:vendas`: 30 clientes e 140 pedidos nos últimos 60 dias, criados pelas próprias regras da API (carrinho, checkout, cupom, pagamento, envio) |
+| 2.6 Testes | Novos testes unitários (11) e de API (22 verificações) para relatório e CEP, e teste automático do dashboard (6 verificações). **E2E depende do app** |
+| 2.8 Projeto zipado | `npm run zip` gera o `MCCAR-projeto.zip` a partir do último commit, sem `.env` (token do Mercado Pago), banco e `node_modules` |
+
 ### Testes unitários (`npm run test:unidade`)
 | Arquivo | O que testa | Testes |
 |---|---|---|
@@ -423,7 +442,8 @@ Para provar que os testes pegam erros, três regras foram sabotadas de propósit
 | `guards.test.js` | `authGuard` (token ausente, errado, expirado, `alg: none`, usuário excluído), `adminGuard`, limite de login (bloqueio, Retry-After, maiúsculas, reset) e `errorHandler` | 19 |
 | `regras.test.js` | Cadastro e login, checkout igual ao resumo, transições de pedido e pagamento, estorno, cartão sem número completo, `carregarQueries` | 18 |
 | `mercadoPago.test.js` | Tradução de status e métodos, montagem da cobrança, checkout, webhook com assinatura, sincronização, sem credencial | 24 |
-| **Total** | | **110** |
+| `relatorio.test.js` | Relatório (faturamento só de pedidos pagos, consistência entre seções) e CEP | 11 |
+| **Total** | | **121** |
 
 ### Testes de API (`npm run test:api`)
 | Bateria | Arquivo | Verificações | Resultado |
@@ -436,7 +456,8 @@ Para provar que os testes pegam erros, três regras foram sabotadas de propósit
 | Aprovação automática do pagamento | `pagamentoAutomatico.test.js` | 18 | ✅ |
 | Telas do Figma (carrinho, checkout, pagamento, listagem, pedidos) | `telas.test.js` | 50 | ✅ |
 | Rotas do Mercado Pago (login, sem credencial, webhook público) | `mercadoPago.test.js` | 16 | ✅ |
-| **Total** | | **375** | ✅ |
+| Relatório em JSON e CEP | `relatorio.test.js` | 22 | ✅ |
+| **Total** | | **397** | ✅ |
 
 Para confirmar que os testes de API também detectam erros, a regra de frete foi alterada de propósito: as baterias de regras e de cupom falharam e apontaram a verificação exata.
 

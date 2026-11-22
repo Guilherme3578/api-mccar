@@ -16,7 +16,9 @@
     "test:unidade": "node --test \"tests/unidade/*.test.js\"",
     "test:api": "node --test \"tests/api/*.test.js\"",
     "test:cobertura": "node --test --experimental-test-coverage --test-coverage-include=\"src/**\" \"tests/unidade/*.test.js\" \"tests/api/*.test.js\"",
-    "test:mercadopago": "node --test \"tests/mercadopago/*.test.js\""
+    "test:mercadopago": "node --test \"tests/mercadopago/*.test.js\"",
+    "seed:vendas": "node src/scripts/seedVendas.js",
+    "zip": "node src/scripts/empacotar.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
