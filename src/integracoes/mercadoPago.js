@@ -42,9 +42,9 @@ function buscarPagamento(id) {
   return chamar((mp) => new Payment(mp).get({ id }));
 }
 
-async function buscarPagamentosDoPedido(idPedido) {
+async function buscarPagamentosDoPedido(referencia) {
   const resultado = await chamar((mp) =>
-    new Payment(mp).search({ options: { external_reference: String(idPedido), sort: 'date_last_updated', criteria: 'desc' } })
+    new Payment(mp).search({ options: { external_reference: referencia, sort: 'date_last_updated', criteria: 'desc' } })
   );
   return resultado?.results ?? [];
 }

@@ -30,8 +30,8 @@ beforeEach(() => {
     return { id, init_point: `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=${id}` };
   });
   mock.method(mercadoPago, 'buscarPagamento', async (id) => pagamentosNoMercadoPago.get(String(id)) ?? null);
-  mock.method(mercadoPago, 'buscarPagamentosDoPedido', async (idPedido) =>
-    [...pagamentosNoMercadoPago.values()].filter((p) => p.external_reference === String(idPedido)).reverse()
+  mock.method(mercadoPago, 'buscarPagamentosDoPedido', async (referencia) =>
+    [...pagamentosNoMercadoPago.values()].filter((p) => p.external_reference === referencia).reverse()
   );
 });
 
@@ -39,7 +39,7 @@ function pagamentoMp(id, pedido, status, extra = {}) {
   const pagamento = {
     id,
     status,
-    external_reference: String(pedido.id_pedido),
+    external_reference: mercadoPagoService.referenciaDoPedido(pedido),
     transaction_amount: pedido.total_centavos / 100,
     payment_type_id: 'credit_card',
     payment_method_id: 'visa',
@@ -76,19 +76,19 @@ describe('montarPreferencia', () => {
   const comprador = { nome: 'Ana', email: 'ana@teste.com' };
 
   test('lista os produtos, cobra o frete e soma exatamente o total do pedido', () => {
-    const pedido = { id_pedido: 7, numero: 'MC-12345', subtotal_centavos: 5980, desconto_centavos: 0, frete_centavos: 2990, total_centavos: 8970 };
+    const pedido = { id_pedido: 7, numero: 'MC-12345', criado_em: '2026-11-22T14:30:00Z', subtotal_centavos: 5980, desconto_centavos: 0, frete_centavos: 2990, total_centavos: 8970 };
     const itens = [{ codigo_produto: 'MC-019', nome_produto: 'Filtro de Óleo', quantidade: 2, preco_unitario_centavos: 2990 }];
     const corpo = mercadoPagoService.montarPreferencia(pedido, itens, comprador);
 
     assert.deepStrictEqual(corpo.items[0], { id: 'MC-019', title: 'Filtro de Óleo', quantity: 2, unit_price: 29.9, currency_id: 'BRL' });
     assert.deepStrictEqual(corpo.items[1], { id: 'FRETE', title: 'Frete', quantity: 1, unit_price: 29.9, currency_id: 'BRL' });
     assert.strictEqual(somaDosItens(corpo.items), pedido.total_centavos);
-    assert.strictEqual(corpo.external_reference, '7');
+    assert.strictEqual(corpo.external_reference, 'MCCAR-7-1795357800');
     assert.deepStrictEqual(corpo.payer, { name: 'Ana', email: 'ana@teste.com' });
   });
 
   test('com cupom, junta os produtos num item com o desconto aplicado', () => {
-    const pedido = { id_pedido: 8, numero: 'MC-22222', subtotal_centavos: 73960, desconto_centavos: 36980, frete_centavos: 0, total_centavos: 36980 };
+    const pedido = { id_pedido: 8, numero: 'MC-22222', criado_em: '2026-11-22T14:30:00Z', subtotal_centavos: 73960, desconto_centavos: 36980, frete_centavos: 0, total_centavos: 36980 };
     const corpo = mercadoPagoService.montarPreferencia(pedido, [], comprador);
     assert.strictEqual(corpo.items.length, 1);
     assert.strictEqual(corpo.items[0].unit_price, 369.8);
@@ -96,7 +96,7 @@ describe('montarPreferencia', () => {
   });
 
   test('usa as URLs do .env para a notificação e o retorno ao app', () => {
-    const corpo = mercadoPagoService.montarPreferencia({ id_pedido: 9, numero: 'MC-1', subtotal_centavos: 100, desconto_centavos: 0, frete_centavos: 0, total_centavos: 100 }, [], comprador);
+    const corpo = mercadoPagoService.montarPreferencia({ id_pedido: 9, numero: 'MC-1', criado_em: '2026-11-22T14:30:00Z', subtotal_centavos: 100, desconto_centavos: 0, frete_centavos: 0, total_centavos: 100 }, [], comprador);
     assert.strictEqual(corpo.notification_url, 'https://api.mccar.test/pagamentos/mercado-pago/webhook');
     assert.strictEqual(corpo.back_urls.success, 'mccar://pagamento?pedido=9&situacao=aprovado');
     assert.strictEqual(corpo.auto_return, 'approved');
@@ -256,6 +256,34 @@ describe('sincronizar (quando o app volta do checkout)', () => {
     const { usuario, endereco } = cenarioDeCompra();
     const pedido = pedidoService.checkout(usuario, { id_endereco: endereco.id_endereco });
     await assert.rejects(mercadoPagoService.sincronizar(usuario, { id_pedido: pedido.id_pedido }), comStatus(404));
+  });
+});
+
+describe('identificação do pedido no Mercado Pago', () => {
+  test('a referência junta o número do pedido e o momento em que ele foi criado', () => {
+    assert.strictEqual(mercadoPagoService.referenciaDoPedido({ id_pedido: 1, criado_em: '2026-11-22T14:30:00Z' }), 'MCCAR-1-1795357800');
+    assert.notStrictEqual(
+      mercadoPagoService.referenciaDoPedido({ id_pedido: 1, criado_em: '2026-11-22T14:30:00Z' }),
+      mercadoPagoService.referenciaDoPedido({ id_pedido: 1, criado_em: '2026-11-22T14:30:01Z' })
+    );
+  });
+
+  test('pagamento de outro banco com o mesmo número de pedido não aprova o pedido (bug de 22/11)', async () => {
+    const { usuario, pedido } = await pedidoComCheckout();
+    const deOutroBanco = { ...pedido, criado_em: '2026-11-01T10:00:00Z' };
+    pagamentosNoMercadoPago.set('3001', { id: 3001, status: 'approved', external_reference: mercadoPagoService.referenciaDoPedido(deOutroBanco), transaction_amount: 999, payment_type_id: 'credit_card', payment_method_id: 'master', card: { last_four_digits: '3311' } });
+    pagamentosNoMercadoPago.set('3002', { id: 3002, status: 'approved', external_reference: String(pedido.id_pedido), transaction_amount: 999, payment_type_id: 'credit_card', payment_method_id: 'master', card: { last_four_digits: '3311' } });
+
+    assert.deepStrictEqual(await mercadoPagoService.receberNotificacao({ headers: assinatura('3001'), query: { type: 'payment', 'data.id': '3001' }, body: {} }), { processado: false });
+    assert.deepStrictEqual(await mercadoPagoService.receberNotificacao({ headers: assinatura('3002'), query: { type: 'payment', 'data.id': '3002' }, body: {} }), { processado: false });
+    const resultado = await mercadoPagoService.sincronizar(usuario, { id_pedido: pedido.id_pedido });
+    assert.strictEqual(resultado.status_pedido, 'AGUARDANDO_PAGAMENTO');
+    assert.strictEqual(resultado.pagamento.status, 'PENDENTE');
+  });
+
+  test('a cobrança enviada usa a referência do pedido', async () => {
+    const { pedido } = await pedidoComCheckout();
+    assert.strictEqual(preferenciasCriadas.at(-1).external_reference, mercadoPagoService.referenciaDoPedido(pedido));
   });
 });
 

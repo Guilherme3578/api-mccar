@@ -1,6 +1,7 @@
 const mercadoPago = require('../integracoes/mercadoPago');
 const configMercadoPago = require('../config/mercadoPago');
 const pagamentoRepository = require('../repositories/pagamentoRepository');
+const pedidoRepository = require('../repositories/pedidoRepository');
 const itemPedidoRepository = require('../repositories/itemPedidoRepository');
 const usuarioRepository = require('../repositories/usuarioRepository');
 const pedidoService = require('./pedidoService');
@@ -66,7 +67,7 @@ function itensDaPreferencia(pedido, itens) {
 function montarPreferencia(pedido, itens, comprador) {
   const corpo = {
     items: itensDaPreferencia(pedido, itens),
-    external_reference: String(pedido.id_pedido),
+    external_reference: referenciaDoPedido(pedido),
     payer: { name: comprador.nome, email: comprador.email },
     statement_descriptor: configMercadoPago.nomeNaFatura,
     metadata: { numero_pedido: pedido.numero },
@@ -130,10 +131,22 @@ async function iniciarCheckout(usuarioLogado, dados) {
   };
 }
 
-function aplicarPagamentoMercadoPago(pagamentoMp) {
-  const idPedido = Number(pagamentoMp.external_reference);
-  if (!Number.isInteger(idPedido) || idPedido <= 0) return null;
+function referenciaDoPedido(pedido) {
+  return `MCCAR-${pedido.id_pedido}-${Date.parse(pedido.criado_em) / 1000}`;
+}
 
+function pedidoDaReferencia(referencia) {
+  const encontrada = /^MCCAR-(\d+)-\d+$/.exec(String(referencia ?? ''));
+  if (!encontrada) return null;
+  const pedido = pedidoRepository.buscarPorId(Number(encontrada[1]));
+  return pedido && referenciaDoPedido(pedido) === referencia ? pedido : null;
+}
+
+function aplicarPagamentoMercadoPago(pagamentoMp) {
+  const pedido = pedidoDaReferencia(pagamentoMp.external_reference);
+  if (!pedido) return null;
+
+  const idPedido = pedido.id_pedido;
   const pagamento = pagamentoRepository.buscarPorPedido(idPedido);
   if (!pagamento || !pagamento.mp_preferencia_id) return null;
 
@@ -181,7 +194,7 @@ async function sincronizar(usuarioLogado, dados) {
     throw new AppError('Este pedido não tem pagamento pelo Mercado Pago', 404);
   }
 
-  const pagamentosMp = await mercadoPago.buscarPagamentosDoPedido(pedido.id_pedido);
+  const pagamentosMp = await mercadoPago.buscarPagamentosDoPedido(referenciaDoPedido(pedido));
   const escolhido = pagamentosMp.find((p) => p.status === 'approved') ?? pagamentosMp[0];
   const atualizado = escolhido ? aplicarPagamentoMercadoPago(escolhido) ?? pagamento : pagamento;
 
@@ -207,6 +220,7 @@ module.exports = {
   statusDoMercadoPago,
   metodoDoMercadoPago,
   montarPreferencia,
+  referenciaDoPedido,
   iniciarCheckout,
   aplicarPagamentoMercadoPago,
   sincronizar,

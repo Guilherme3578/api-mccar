@@ -42,7 +42,17 @@ export const styles = StyleSheet.create({
     height: 48,
   },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoBox: { width: 24, height: 24, borderRadius: 6, backgroundColor: COLORS.dark },
+  logoBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: COLORS.dark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  logoBoxGrande: { width: 30, height: 30, borderRadius: 8 },
+  logoImagem: { width: '92%', height: '92%' },
   logoText: { fontFamily: FONTS.bold, fontSize: 18, letterSpacing: 0.18, color: COLORS.dark },
   topBar: {
     flexDirection: 'row',

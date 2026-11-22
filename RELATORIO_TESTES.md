@@ -11,13 +11,13 @@
 
 | Indicador | Resultado |
 |---|---|
-| Testes de backend (unitários) | **121 testes, 121 aprovados** |
+| Testes de backend (unitários) | **124 testes, 124 aprovados** |
 | Testes de API (integração HTTP) | **9 baterias com 397 verificações, todas aprovadas** |
 | Teste do dashboard em Python | **6 verificações, todas aprovadas** |
 | Falhas | **0** |
 | Tempo total de execução | cerca de 3 segundos |
-| Cobertura de linhas do código (`src/`) | **91,7%** |
-| Cobertura de decisões (branches) | **91,2%** |
+| Cobertura de linhas do código (`src/`) | **91,8%** |
+| Cobertura de decisões (branches) | **91,3%** |
 | Mercado Pago real (credencial de teste) | **Teste automático aprovado e compra de teste paga de ponta a ponta** |
 
 Os testes são automatizados e reproduzíveis: qualquer pessoa da equipe roda tudo com um comando, sem servidor ligado, sem banco preparado e sem internet.
@@ -33,13 +33,13 @@ Os testes são automatizados e reproduzíveis: qualquer pessoa da equipe roda tu
 | **Exemplo** | `freteService.calcular(...)` com R$ 100 em produtos deve devolver frete 0 | `GET /carrinhos/meu` com R$ 100 no carrinho deve devolver `frete_centavos: 0` |
 | **Pasta** | `tests/unidade/` | `tests/api/` |
 | **Comando** | `npm run test:unidade` | `npm run test:api` |
-| **Cobertura sozinho** | 80,5% das linhas | 87,7% das linhas |
+| **Cobertura sozinho** | 80,7% das linhas | 87,5% das linhas |
 
 Os dois tipos se completam:
 - O unitário testa casos difíceis de provocar por HTTP: token expirado, notificação falsa do Mercado Pago, arredondamento de centavos.
 - O de API confirma que as peças funcionam juntas: rotas, guards, controllers, services e banco.
 
-Somados, chegam a **91,7%** de cobertura.
+Somados, chegam a **91,8%** de cobertura.
 
 ---
 
@@ -100,7 +100,7 @@ tests/
 
 ## 4. Testes de backend (unitários)
 
-**121 testes em 32 grupos, todos aprovados (cerca de 1,5 s).**
+**124 testes em 33 grupos, todos aprovados (cerca de 1,5 s).**
 
 | Arquivo | Parte do código | Testes | Resultado |
 |---|---|---|---|
@@ -109,9 +109,9 @@ tests/
 | `calculos.test.js` | `services/freteService.js` e cálculos do `cupomService.js` | 14 | ✅ |
 | `guards.test.js` | `guards/` (autenticação, admin, limite de login, erros) | 19 | ✅ |
 | `regras.test.js` | `usuarioService`, `pedidoService`, `pagamentoService`, `carrinhoService`, `carregarQueries` | 18 | ✅ |
-| `mercadoPago.test.js` | `services/mercadoPagoService.js` e `integracoes/mercadoPago.js` | 24 | ✅ |
+| `mercadoPago.test.js` | `services/mercadoPagoService.js` e `integracoes/mercadoPago.js` | 27 | ✅ |
 | `relatorio.test.js` | `services/relatorioService.js`, `services/cepService.js` e `integracoes/viaCep.js` | 11 | ✅ |
-| **Total** | | **121** | ✅ |
+| **Total** | | **124** | ✅ |
 
 ### 4.1 Validação de dados (`validacao.test.js`)
 | O que é verificado | Casos |
@@ -301,6 +301,7 @@ Um teste só tem valor se falhar quando o código está errado. Para provar isso
 | Verificação do valor pago no Mercado Pago desligada | ❌ Falhou o teste "pagamento com valor menor que o pedido não aprova" |
 | Validação de id passou a aceitar `0` e `01` | ❌ Falharam os testes "recusa 0" e "recusa 01" |
 | Pedidos "ENVIADO" retirados da conta do faturamento no relatório (`resumo.sql`) | ❌ Falharam os testes "só pedidos pagos, enviados ou entregues contam como faturamento" e "categorias, produtos, estados e cupons batem com os pedidos" |
+| Conferência da identificação do pedido no Mercado Pago desligada | ❌ Falhou o teste "pagamento de outro banco com o mesmo número de pedido não aprova o pedido (bug de 22/11)" |
 | Regra de frete alterada pelo `.env` (frete grátis só acima de R$ 9.999,99) | ❌ Baterias de API de regras e de cupom falharam, apontando a verificação exata |
 
 Em todos os casos os testes acusaram o problema e indicaram a regra quebrada.
@@ -313,9 +314,9 @@ Medida com `npm run test:cobertura` sobre a pasta `src/`:
 
 | Métrica | Unitários | API | **Todos juntos** |
 |---|---|---|---|
-| Linhas | 80,5% | 87,7% | **91,7%** |
-| Decisões (branches) | 82,9% | 88,0% | **91,2%** |
-| Funções | 64,8% | 81,4% | **83,7%** |
+| Linhas | 80,7% | 87,5% | **91,8%** |
+| Decisões (branches) | 83,2% | 88,0% | **91,3%** |
+| Funções | 65,1% | 81,2% | **83,8%** |
 
 ### Por camada
 | Camada | Linhas cobertas | Observação |
@@ -362,6 +363,15 @@ Feita com a API rodando com o `.env` real, como o app faria:
 | Tentar pagar o mesmo pedido de novo | Bloqueado: `400 O pedido precisa estar com status AGUARDANDO_PAGAMENTO` |
 
 **Lição registrada:** na primeira tentativa, abrindo o checkout sem login, o Mercado Pago mostrou "Uma das partes com as quais você está tentando efetuar o pagamento é de teste". Com credenciais de teste, **o pagamento precisa ser feito logado com uma conta de teste do tipo Comprador** (painel → Contas de teste → Criar nova conta), numa janela anônima. A API não precisou de nenhuma mudança.
+
+### Bug encontrado pelo teste real (22/11/2026, depois da integração com o front)
+Ao rodar o `npm run test:mercadopago` de novo, o teste falhou: um pedido **recém-criado e não pago** apareceu como `PAGO` ao sincronizar.
+
+**Causa:** a API identificava o pedido no Mercado Pago só pelo número interno (`external_reference = "1"`). Esse número recomeça em 1 toda vez que o banco é recriado. O banco temporário do teste criou o pedido 1, e o Mercado Pago devolveu o pagamento aprovado de R$ 189,70 da compra manual (que também era o pedido 1, em outro banco). A proteção de "valor pago menor que o pedido" não barrou, porque o valor antigo era maior.
+
+**Risco:** apagar a pasta `data/` e rodar `npm run setup` antes da apresentação faria o primeiro pedido novo aparecer como pago.
+
+**Correção:** a identificação passou a ser o número do pedido mais o momento exato em que ele foi criado (`MCCAR-1-1795357800`), e a API só aplica um pagamento se a identificação bater exatamente com o pedido do banco atual. Foram criados 3 testes unitários, incluindo um que reproduz o bug, e uma verificação no teste real. A sabotagem da correção foi detectada pelo teste. Depois da correção, todos os testes passaram, inclusive o `npm run test:mercadopago`.
 
 ## 9. Limitações e próximos passos
 

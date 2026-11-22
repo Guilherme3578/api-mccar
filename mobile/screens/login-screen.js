@@ -27,7 +27,7 @@ export default function LoginScreen({ onLogin, onRegister, initialEmail = '', me
   }
 
   return (
-    <AuthLayout title="Criar uma conta" subtitle="Insira seu e-mail para se cadastrar ou entrar">
+    <AuthLayout title="Faça seu login" subtitle="Preencha com seu e-mail e senha para entrar">
       <FormMessage success>{message}</FormMessage>
       <Field
         placeholder="email@dominio.com"

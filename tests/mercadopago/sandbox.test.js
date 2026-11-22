@@ -56,7 +56,9 @@ test('Mercado Pago de verdade (credencial de teste)', { skip: semCredencial, tim
 
     const noMercadoPago = await preferencias.get({ preferenceId: checkout.pagamento.mp_preferencia_id });
     const somaCentavos = Math.round(noMercadoPago.items.reduce((soma, item) => soma + item.unit_price * item.quantity * 100, 0));
-    conferir(noMercadoPago.external_reference === String(pedido.id_pedido), 'a cobrança está ligada ao pedido (external_reference)', noMercadoPago.external_reference);
+    conferir(new RegExp(`^MCCAR-${pedido.id_pedido}-\\d+$`).test(noMercadoPago.external_reference ?? ''), 'a cobrança está ligada ao pedido (external_reference único)', noMercadoPago.external_reference);
+    const sincronizadoAntes = await req(ana.token, 'POST', '/pagamentos/mercado-pago/sincronizar', { id_pedido: pedido.id_pedido }, 200, 'sincroniza logo após criar a cobrança');
+    conferir(sincronizadoAntes?.status_pedido === 'AGUARDANDO_PAGAMENTO', 'pagamentos antigos de outro banco não marcam este pedido como pago', sincronizadoAntes);
     conferir(somaCentavos === pedido.total_centavos, 'o Mercado Pago vai cobrar exatamente o total do pedido', { somaCentavos, total: pedido.total_centavos });
     conferir(noMercadoPago.items.some((item) => item.title === 'Frete' && item.unit_price === 29.9), 'o frete aparece como item na cobrança', noMercadoPago.items);
     conferir(noMercadoPago.items.some((item) => item.title === 'Filtro de Óleo' && item.quantity === 2), 'os produtos aparecem com a quantidade', noMercadoPago.items);

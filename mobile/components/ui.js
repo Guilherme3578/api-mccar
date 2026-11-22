@@ -100,7 +100,14 @@ export function Logo({ size = 'sm' }) {
   const grande = size === 'lg';
   return (
     <View style={styles.logoRow}>
-      <View style={[styles.logoBox, grande && { width: 30, height: 30, borderRadius: 8 }]} />
+      <View style={[styles.logoBox, grande && styles.logoBoxGrande]}>
+        <Image
+          source={require('../assets/logo-icone.png')}
+          style={styles.logoImagem}
+          resizeMode="contain"
+          accessibilityLabel="Logo Mercado Car"
+        />
+      </View>
       <Text style={[styles.logoText, grande && { fontSize: 24, letterSpacing: 0.24 }]}>MCCAR</Text>
     </View>
   );

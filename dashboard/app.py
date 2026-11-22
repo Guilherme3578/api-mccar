@@ -10,7 +10,10 @@ import streamlit as st
 PASTA = Path(__file__).parent
 ARQUIVO_EXEMPLO = PASTA / "dados-exemplo.json"
 STATUS_FATURADOS = ["PAGO", "ENVIADO", "ENTREGUE"]
-CORES = ["#F2B705", "#1F2A44", "#3E7CB1", "#81A4CD", "#D9534F", "#5CB85C", "#8E6C8A", "#F0AD4E"]
+CORES = [
+    "#F2B705", "#1F2A44", "#3E7CB1", "#81A4CD",
+    "#D9534F", "#5CB85C", "#8E6C8A", "#F0AD4E",
+]
 NOMES_STATUS = {
     "AGUARDANDO_PAGAMENTO": "Aguardando pagamento",
     "PAGO": "Pago",
@@ -18,7 +21,16 @@ NOMES_STATUS = {
     "ENTREGUE": "Entregue",
     "CANCELADO": "Cancelado",
 }
-NOMES_METODO = {"PIX": "Pix", "CARTAO": "Cartão", "BOLETO": "Boleto", "MERCADO_PAGO": "Mercado Pago"}
+NOMES_METODO = {
+    "PIX": "Pix",
+    "CARTAO": "Cartão",
+    "BOLETO": "Boleto",
+    "MERCADO_PAGO": "Mercado Pago",
+}
+COLUNAS_DA_TABELA = [
+    "numero", "criado_em", "status", "cidade", "uf",
+    "quantidade_itens", "cupom", "metodo_pagamento", "total",
+]
 
 
 def reais(centavos):
@@ -31,7 +43,8 @@ def requisitar(url, corpo=None, token=None):
     if token:
         cabecalhos["Authorization"] = f"Bearer {token}"
     dados = json.dumps(corpo).encode() if corpo is not None else None
-    pedido = urllib.request.Request(url, data=dados, headers=cabecalhos, method="POST" if corpo is not None else "GET")
+    metodo = "POST" if corpo is not None else "GET"
+    pedido = urllib.request.Request(url, data=dados, headers=cabecalhos, method=metodo)
     try:
         with urllib.request.urlopen(pedido, timeout=15) as resposta:
             return json.loads(resposta.read().decode())
@@ -50,14 +63,17 @@ def buscar_da_api(url_base, email, senha):
 
 def carregar_dados():
     st.sidebar.header("Fonte dos dados")
-    fonte = st.sidebar.radio("Origem", ["Arquivo JSON", "API ao vivo"], label_visibility="collapsed")
+    fonte = st.sidebar.radio(
+        "Origem", ["Arquivo JSON", "API ao vivo"], label_visibility="collapsed"
+    )
 
     if fonte == "Arquivo JSON":
         enviado = st.sidebar.file_uploader("JSON gerado pelo app", type="json")
         if enviado is not None:
             return json.load(enviado), enviado.name
         if ARQUIVO_EXEMPLO.exists():
-            return json.loads(ARQUIVO_EXEMPLO.read_text(encoding="utf-8")), ARQUIVO_EXEMPLO.name
+            exemplo = json.loads(ARQUIVO_EXEMPLO.read_text(encoding="utf-8"))
+            return exemplo, ARQUIVO_EXEMPLO.name
         return None, None
 
     url = st.sidebar.text_input("Endereço da API", "http://localhost:3000")
@@ -113,13 +129,29 @@ def indicadores(pedidos):
 
 def grafico_faturamento_por_dia(pedidos):
     faturados = pedidos[pedidos["faturado"]]
-    por_dia = faturados.groupby("dia").agg(faturamento=("total", "sum"), pedidos=("numero", "count")).reset_index()
+    por_dia = (
+        faturados.groupby("dia")
+        .agg(faturamento=("total", "sum"), pedidos=("numero", "count"))
+        .reset_index()
+    )
     if por_dia.empty:
         st.info("Sem vendas no período.")
         return
     por_dia["media_movel"] = por_dia["faturamento"].rolling(7, min_periods=1).mean()
-    figura = px.bar(por_dia, x="dia", y="faturamento", labels={"dia": "Dia", "faturamento": "Faturamento (R$)"}, color_discrete_sequence=[CORES[0]])
-    figura.add_scatter(x=por_dia["dia"], y=por_dia["media_movel"], mode="lines", name="Média de 7 dias", line={"color": CORES[1], "width": 3})
+    figura = px.bar(
+        por_dia,
+        x="dia",
+        y="faturamento",
+        labels={"dia": "Dia", "faturamento": "Faturamento (R$)"},
+        color_discrete_sequence=[CORES[0]],
+    )
+    figura.add_scatter(
+        x=por_dia["dia"],
+        y=por_dia["media_movel"],
+        mode="lines",
+        name="Média de 7 dias",
+        line={"color": CORES[1], "width": 3},
+    )
     figura.update_layout(legend={"orientation": "h", "y": 1.12}, margin={"t": 30})
     st.plotly_chart(figura, width="stretch")
 
@@ -128,7 +160,9 @@ def grafico_pizza(tabela, nomes, valores, titulo_vazio):
     if tabela.empty:
         st.info(titulo_vazio)
         return
-    figura = px.pie(tabela, names=nomes, values=valores, hole=0.45, color_discrete_sequence=CORES)
+    figura = px.pie(
+        tabela, names=nomes, values=valores, hole=0.45, color_discrete_sequence=CORES
+    )
     figura.update_traces(textinfo="percent+label")
     figura.update_layout(showlegend=False, margin={"t": 10, "b": 10})
     st.plotly_chart(figura, width="stretch")
@@ -138,11 +172,89 @@ def grafico_barras(tabela, x, y, rotulos, horizontal=False):
     if tabela.empty:
         st.info("Sem dados.")
         return
-    figura = px.bar(tabela, x=x, y=y, labels=rotulos, orientation="h" if horizontal else "v", color_discrete_sequence=[CORES[2]], text_auto=True)
+    figura = px.bar(
+        tabela,
+        x=x,
+        y=y,
+        labels=rotulos,
+        orientation="h" if horizontal else "v",
+        color_discrete_sequence=[CORES[2]],
+        text_auto=True,
+    )
     if horizontal:
         figura.update_layout(yaxis={"categoryorder": "total ascending"})
     figura.update_layout(margin={"t": 10})
     st.plotly_chart(figura, width="stretch")
+
+
+def secao_dia_e_status(pedidos):
+    esquerda, direita = st.columns([2, 1])
+    with esquerda:
+        st.subheader("Faturamento por dia")
+        grafico_faturamento_por_dia(pedidos)
+    with direita:
+        st.subheader("Pedidos por status")
+        por_status = pedidos.groupby("status").size().reset_index(name="pedidos")
+        nomes = por_status["status"].map(NOMES_STATUS)
+        por_status["status"] = nomes.fillna(por_status["status"])
+        grafico_pizza(por_status, "status", "pedidos", "Sem pedidos.")
+
+
+def secao_pagamento_e_estado(pedidos):
+    faturados = pedidos[pedidos["faturado"]]
+    esquerda, direita = st.columns(2)
+    with esquerda:
+        st.subheader("Formas de pagamento")
+        pagos = faturados[faturados["metodo_pagamento"].notna()]
+        por_metodo = pagos.groupby("metodo_pagamento").agg(valor=("total", "sum")).reset_index()
+        nomes = por_metodo["metodo_pagamento"].map(NOMES_METODO)
+        por_metodo["metodo_pagamento"] = nomes.fillna(por_metodo["metodo_pagamento"])
+        grafico_pizza(por_metodo, "metodo_pagamento", "valor", "Sem pagamentos aprovados.")
+    with direita:
+        st.subheader("Faturamento por estado")
+        por_estado = (
+            faturados.groupby("uf")
+            .agg(faturamento=("total", "sum"))
+            .reset_index()
+            .sort_values("faturamento", ascending=False)
+        )
+        rotulos = {"uf": "Estado", "faturamento": "Faturamento (R$)"}
+        grafico_barras(por_estado, "uf", "faturamento", rotulos)
+
+
+def secao_categorias_e_produtos(dados):
+    st.divider()
+    st.caption("Categorias, produtos e cupons consideram todo o histórico do JSON.")
+    esquerda, direita = st.columns(2)
+    with esquerda:
+        st.subheader("Itens vendidos por categoria")
+        categorias = pd.DataFrame(dados.get("vendas_por_categoria", []))
+        rotulos = {"categoria": "Categoria", "itens": "Itens vendidos"}
+        grafico_barras(categorias, "categoria", "itens", rotulos)
+    with direita:
+        st.subheader("Top 10 produtos")
+        produtos = pd.DataFrame(dados.get("produtos_mais_vendidos", [])).head(10)
+        rotulos = {"quantidade": "Unidades vendidas", "nome": ""}
+        grafico_barras(produtos, "quantidade", "nome", rotulos, horizontal=True)
+
+
+def secao_cupons(dados):
+    st.subheader("Cupons")
+    cupons = pd.DataFrame(dados.get("cupons", []))
+    if cupons.empty:
+        st.info("Nenhum cupom cadastrado.")
+        return
+    cupons["desconto total"] = cupons["desconto_centavos"].map(reais)
+    colunas = ["codigo", "tipo", "valor", "usos", "desconto total"]
+    st.dataframe(cupons[colunas], hide_index=True, width="stretch")
+
+
+def secao_tabela_de_pedidos(pedidos):
+    with st.expander("Pedidos do período"):
+        tabela = pedidos[COLUNAS_DA_TABELA].sort_values("criado_em", ascending=False)
+        st.dataframe(tabela, hide_index=True, width="stretch")
+        csv = tabela.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("Baixar CSV", csv, "pedidos-mccar.csv", "text/csv")
 
 
 def main():
@@ -163,54 +275,11 @@ def main():
 
     indicadores(pedidos)
     st.divider()
-
-    esquerda, direita = st.columns([2, 1])
-    with esquerda:
-        st.subheader("Faturamento por dia")
-        grafico_faturamento_por_dia(pedidos)
-    with direita:
-        st.subheader("Pedidos por status")
-        por_status = pedidos.groupby("status").size().reset_index(name="pedidos")
-        por_status["status"] = por_status["status"].map(NOMES_STATUS).fillna(por_status["status"])
-        grafico_pizza(por_status, "status", "pedidos", "Sem pedidos.")
-
-    esquerda, direita = st.columns(2)
-    with esquerda:
-        st.subheader("Formas de pagamento")
-        pagos = pedidos[pedidos["faturado"] & pedidos["metodo_pagamento"].notna()]
-        por_metodo = pagos.groupby("metodo_pagamento").agg(valor=("total", "sum")).reset_index()
-        por_metodo["metodo_pagamento"] = por_metodo["metodo_pagamento"].map(NOMES_METODO).fillna(por_metodo["metodo_pagamento"])
-        grafico_pizza(por_metodo, "metodo_pagamento", "valor", "Sem pagamentos aprovados.")
-    with direita:
-        st.subheader("Faturamento por estado")
-        por_estado = pedidos[pedidos["faturado"]].groupby("uf").agg(faturamento=("total", "sum")).reset_index().sort_values("faturamento", ascending=False)
-        grafico_barras(por_estado, "uf", "faturamento", {"uf": "Estado", "faturamento": "Faturamento (R$)"})
-
-    st.divider()
-    st.caption("Categorias, produtos e cupons consideram todo o histórico do JSON.")
-    esquerda, direita = st.columns(2)
-    with esquerda:
-        st.subheader("Itens vendidos por categoria")
-        categorias = pd.DataFrame(dados.get("vendas_por_categoria", []))
-        grafico_barras(categorias, "categoria", "itens", {"categoria": "Categoria", "itens": "Itens vendidos"})
-    with direita:
-        st.subheader("Top 10 produtos")
-        produtos = pd.DataFrame(dados.get("produtos_mais_vendidos", [])).head(10)
-        grafico_barras(produtos, "quantidade", "nome", {"quantidade": "Unidades vendidas", "nome": ""}, horizontal=True)
-
-    st.subheader("Cupons")
-    cupons = pd.DataFrame(dados.get("cupons", []))
-    if cupons.empty:
-        st.info("Nenhum cupom cadastrado.")
-    else:
-        cupons["desconto total"] = cupons["desconto_centavos"].map(reais)
-        st.dataframe(cupons[["codigo", "tipo", "valor", "usos", "desconto total"]], hide_index=True, width="stretch")
-
-    with st.expander("Pedidos do período"):
-        colunas = ["numero", "criado_em", "status", "cidade", "uf", "quantidade_itens", "cupom", "metodo_pagamento", "total"]
-        tabela = pedidos[colunas].sort_values("criado_em", ascending=False)
-        st.dataframe(tabela, hide_index=True, width="stretch")
-        st.download_button("Baixar CSV", tabela.to_csv(index=False).encode("utf-8-sig"), "pedidos-mccar.csv", "text/csv")
+    secao_dia_e_status(pedidos)
+    secao_pagamento_e_estado(pedidos)
+    secao_categorias_e_produtos(dados)
+    secao_cupons(dados)
+    secao_tabela_de_pedidos(pedidos)
 
 
 if __name__ == "__main__":
