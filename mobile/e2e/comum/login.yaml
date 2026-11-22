@@ -1,0 +1,16 @@
+appId: host.exp.exponent
+---
+- runFlow: abrir-app.yaml
+- runFlow:
+    when:
+      visible: "Continuar"
+    commands:
+      - tapOn: "E-mail"
+      - inputText: ${EMAIL}
+      - tapOn: "Senha"
+      - inputText: ${SENHA}
+      - hideKeyboard
+      - tapOn: "Continuar"
+- extendedWaitUntil:
+    visible: "Destaques"
+    timeout: 30000

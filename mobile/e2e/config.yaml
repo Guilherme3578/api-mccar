@@ -1,0 +1,10 @@
+flows:
+  - "*"
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - 01-login
+    - 02-compra-pix
+    - 03-endereco-crud
+    - 04-admin-produto-crud
+    - 05-gerar-json

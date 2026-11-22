@@ -1,0 +1,26 @@
+const FOTOS = {
+  'MC-001': require('./MC-001.jpg'),
+  'MC-002': require('./MC-002.jpg'),
+  'MC-003': require('./MC-003.jpg'),
+  'MC-004': require('./MC-004.jpg'),
+  'MC-005': require('./MC-005.jpg'),
+  'MC-006': require('./MC-006.jpg'),
+  'MC-007': require('./MC-007.jpg'),
+  'MC-008': require('./MC-008.jpg'),
+  'MC-009': require('./MC-009.jpg'),
+  'MC-010': require('./MC-010.jpg'),
+  'MC-011': require('./MC-011.jpg'),
+  'MC-012': require('./MC-012.jpg'),
+  'MC-013': require('./MC-013.jpg'),
+  'MC-014': require('./MC-014.jpg'),
+  'MC-015': require('./MC-015.jpg'),
+  'MC-016': require('./MC-016.jpg'),
+  'MC-017': require('./MC-017.jpg'),
+  'MC-018': require('./MC-018.jpg'),
+  'MC-019': require('./MC-019.jpg'),
+  'MC-020': require('./MC-020.jpg'),
+  'MC-021': require('./MC-021.jpg'),
+  'MC-022': require('./MC-022.jpg'),
+};
+
+export default FOTOS;

@@ -1,0 +1,24 @@
+appId: host.exp.exponent
+name: Login e logout
+env:
+  EMAIL: ${CLIENTE_EMAIL}
+  SENHA: ${CLIENTE_SENHA}
+---
+- runFlow: comum/abrir-app.yaml
+- runFlow:
+    when:
+      visible: "Destaques"
+    commands:
+      - tapOn: "Perfil"
+      - tapOn: "Sair da conta"
+      - tapOn: "Sair"
+- tapOn: "E-mail"
+- inputText: "nao-existe@mccar.com"
+- tapOn: "Senha"
+- inputText: "senhaerrada"
+- hideKeyboard
+- tapOn: "Continuar"
+- assertVisible: ".*inválid.*"
+- runFlow: comum/login.yaml
+- assertVisible: "Buscar peças, marcas ou códigos"
+- assertVisible: "Início"
