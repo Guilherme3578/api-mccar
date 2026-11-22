@@ -1,0 +1,14 @@
+appId: host.exp.exponent
+name: Admin - gerar dados em JSON para o dashboard
+env:
+  EMAIL: ${ADMIN_EMAIL}
+  SENHA: ${ADMIN_SENHA}
+---
+- runFlow: comum/login.yaml
+- tapOn: "Perfil"
+- tapOn: "Gerar JSON"
+- extendedWaitUntil:
+    notVisible: "Gerando arquivo..."
+    timeout: 20000
+- back
+- assertVisible: "Dados exportados|Gerar JSON"

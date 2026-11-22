@@ -1,0 +1,8 @@
+appId: host.exp.exponent
+---
+- launchApp:
+    clearState: true
+- openLink: ${EXPO_URL}
+- extendedWaitUntil:
+    visible: "Continuar|Destaques"
+    timeout: 90000

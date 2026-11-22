@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "MCCAR",
+    "slug": "mccar-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FFFFFF",
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "softwareKeyboardLayoutMode": "pan"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-status-bar",
+      "expo-sharing",
+      "expo-web-browser",
+      "expo-asset"
+    ]
+  }
+}

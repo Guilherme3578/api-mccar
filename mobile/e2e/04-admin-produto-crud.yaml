@@ -1,0 +1,45 @@
+appId: host.exp.exponent
+name: Admin - cadastro de produto (inserir, consultar, alterar e excluir)
+env:
+  EMAIL: ${ADMIN_EMAIL}
+  SENHA: ${ADMIN_SENHA}
+---
+- evalScript: ${output.codigo = 'E2E-' + Date.now().toString().slice(-6)}
+- evalScript: ${output.nome = 'Produto Teste ' + output.codigo}
+- runFlow: comum/login.yaml
+- tapOn: "Perfil"
+- tapOn: "Gerenciar produtos"
+- assertVisible: "Gerenciar produtos"
+- tapOn: "Novo produto"
+- tapOn: "Freios"
+- tapOn: "MC-023"
+- inputText: ${output.codigo}
+- tapOn: "Bosch"
+- inputText: "Marca E2E"
+- tapOn: "Pastilha de Freio Dianteira"
+- inputText: ${output.nome}
+- tapOn: "Detalhes, material e indicação de uso"
+- inputText: "Produto criado pelo teste automatizado E2E"
+- hideKeyboard
+- tapOn: "R$ 0,00"
+- inputText: "4990"
+- hideKeyboard
+- tapOn: "Cadastrar produto"
+- tapOn: "OK"
+- tapOn: "Buscar por nome, marca ou código"
+- inputText: ${output.codigo}
+- hideKeyboard
+- assertVisible: ${output.nome}
+- assertVisible: "R$ 49,90"
+- tapOn: ${output.nome}
+- assertVisible: "Editar produto"
+- tapOn: "R$ 49,90"
+- eraseText: 12
+- inputText: "5990"
+- hideKeyboard
+- tapOn: "Salvar alterações"
+- tapOn: "OK"
+- assertVisible: "R$ 59,90"
+- tapOn: ${'Excluir ' + output.nome}
+- tapOn: "Excluir"
+- assertNotVisible: ${output.nome}

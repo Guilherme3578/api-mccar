@@ -1,0 +1,37 @@
+appId: host.exp.exponent
+name: Endereço (inserir com CEP, consultar, alterar e excluir)
+env:
+  EMAIL: ${CLIENTE_EMAIL}
+  SENHA: ${CLIENTE_SENHA}
+---
+- runFlow: comum/login.yaml
+- tapOn: "Perfil"
+- tapOn: "ENDEREÇOS"
+- tapOn: "Novo endereço"
+- tapOn: "CEP"
+- inputText: "20040020"
+- extendedWaitUntil:
+    visible: "Rio de Janeiro"
+    timeout: 15000
+- tapOn: "Número"
+- inputText: "50"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Salvar endereço"
+- tapOn: "Salvar endereço"
+- tapOn: "ENDEREÇOS"
+- assertVisible: ".*, 50 · Rio de Janeiro, RJ"
+- tapOn: ".*, 50 · Rio de Janeiro, RJ"
+- assertVisible: "Editar endereço"
+- tapOn: "Número"
+- eraseText: 5
+- inputText: "75"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Salvar alterações"
+- tapOn: "Salvar alterações"
+- tapOn: "ENDEREÇOS"
+- assertVisible: ".*, 75 · Rio de Janeiro, RJ"
+- tapOn: "Remover .*, 75 · Rio de Janeiro, RJ"
+- tapOn: "Remover"
+- assertNotVisible: ".*, 75 · Rio de Janeiro, RJ"

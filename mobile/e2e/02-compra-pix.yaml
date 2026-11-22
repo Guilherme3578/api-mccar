@@ -1,0 +1,47 @@
+appId: host.exp.exponent
+name: Compra completa (catálogo, carrinho, checkout e pagamento Pix)
+env:
+  EMAIL: ${CLIENTE_EMAIL}
+  SENHA: ${CLIENTE_SENHA}
+---
+- runFlow: comum/login.yaml
+- tapOn: "Peças"
+- tapOn: "Buscar.*"
+- inputText: "Pastilha"
+- hideKeyboard
+- tapOn: "Pastilha de Freio Dianteira"
+- assertVisible: "Detalhes"
+- tapOn: "Adicionar ao carrinho"
+- tapOn: "Ver carrinho"
+- assertVisible: "Carrinho"
+- assertVisible: "Pastilha de Freio Dianteira"
+- tapOn: "Finalizar compra"
+- assertVisible: "ENTREGA"
+- runFlow:
+    when:
+      visible: "Adicionar endereço"
+    commands:
+      - tapOn: "Adicionar endereço"
+      - tapOn: "Novo endereço"
+      - tapOn: "CEP"
+      - inputText: "01001000"
+      - extendedWaitUntil:
+          visible: "Praça da Sé"
+          timeout: 15000
+      - tapOn: "Número"
+      - inputText: "100"
+      - hideKeyboard
+      - scrollUntilVisible:
+          element: "Salvar endereço"
+      - tapOn: "Salvar endereço"
+- tapOn: "Fazer pedido"
+- assertVisible: "Pagamento"
+- tapOn: "Pagar no app"
+- tapOn: "Pix"
+- tapOn: "Confirmar pagamento"
+- extendedWaitUntil:
+    visible: "Pedido confirmado"
+    timeout: 20000
+- assertVisible: "PEDIDO"
+- tapOn: "Acompanhar pedido"
+- assertVisible: "Pedido MC-.*"
