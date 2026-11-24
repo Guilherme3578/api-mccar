@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
 
@@ -5,17 +6,26 @@ const CHAVE_TOKEN = 'mccar:token';
 let token = null;
 let aoExpirar = null;
 
+const armazenamento =
+  Platform.OS === 'web'
+    ? {
+        getItem: async (chave) => window.sessionStorage.getItem(chave),
+        setItem: async (chave, valor) => window.sessionStorage.setItem(chave, valor),
+        removeItem: async (chave) => window.sessionStorage.removeItem(chave),
+      }
+    : AsyncStorage;
+
 export async function carregarToken() {
-  token = await AsyncStorage.getItem(CHAVE_TOKEN);
+  token = await armazenamento.getItem(CHAVE_TOKEN);
   return token;
 }
 
 export async function salvarToken(novo) {
   token = novo;
   if (novo) {
-    await AsyncStorage.setItem(CHAVE_TOKEN, novo);
+    await armazenamento.setItem(CHAVE_TOKEN, novo);
   } else {
-    await AsyncStorage.removeItem(CHAVE_TOKEN);
+    await armazenamento.removeItem(CHAVE_TOKEN);
   }
 }
 

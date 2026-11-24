@@ -18,7 +18,15 @@ function enderecosDeRede() {
     .map((rede) => rede.address);
 }
 
-const servidor = app.listen(porta, '0.0.0.0', () => {
+const servidor = app.listen(porta, '0.0.0.0', (erro) => {
+  if (erro) {
+    console.error(
+      erro.code === 'EADDRINUSE'
+        ? `A porta ${porta} já está em uso: a API já está rodando em outro terminal. Feche-o e rode de novo.`
+        : erro.message
+    );
+    process.exit(1);
+  }
   console.log(`API MCCAR rodando em http://localhost:${porta}`);
   for (const ip of enderecosDeRede()) {
     console.log(`Acesso pela rede (Expo): http://${ip}:${porta}`);
