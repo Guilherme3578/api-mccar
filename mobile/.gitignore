@@ -29,3 +29,7 @@ yarn-error.*
 .DS_Store
 Thumbs.db
 *.pem
+
+e2e-web/resultados/
+e2e-web/relatorio/
+e2e-web/prints/

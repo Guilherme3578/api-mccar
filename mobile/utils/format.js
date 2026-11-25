@@ -15,10 +15,10 @@ export function dataBr(iso) {
 
 export function enderecoTexto(e) {
   if (!e) return '';
-  const rua = e.logradouro || e.entrega_logradouro;
-  const num = e.numero || e.entrega_numero;
-  const cidade = e.cidade || e.entrega_cidade;
-  const uf = e.uf || e.entrega_uf;
+  const rua = e.entrega_logradouro || e.logradouro;
+  const num = e.entrega_numero || e.numero;
+  const cidade = e.entrega_cidade || e.cidade;
+  const uf = e.entrega_uf || e.uf;
   return rua + ', ' + num + ' · ' + cidade + ', ' + uf;
 }
 
