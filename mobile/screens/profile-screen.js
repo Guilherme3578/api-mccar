@@ -32,7 +32,7 @@ import {
   atualizarUsuario,
   removerUsuario,
 } from '../services/account';
-import { listarPedidos, detalharPedido, cancelarPedido } from '../services/shop';
+import { listarPedidos, detalharPedido, cancelarPedido, alterarStatusPedido } from '../services/shop';
 import { exportarJson } from '../services/export';
 import { brl, dataBr, enderecoTexto, iniciais, mascaraCep, nomeBandeira, prazoTexto, textoMetodo } from '../utils/format';
 
@@ -156,6 +156,7 @@ export default function Profile({
   const [detalhe, setDetalhe] = useState(null);
   const [busy, setBusy] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [avancando, setAvancando] = useState(false);
   const admin = user.perfil === 'ADMIN';
 
   const carregar = useCallback(
@@ -250,6 +251,19 @@ export default function Profile({
     } catch (e) {
       setDetalhe(null);
       Alert.alert('Pedido', e.message);
+    }
+  }
+
+  async function avancarStatus(status) {
+    setAvancando(true);
+    try {
+      await alterarStatusPedido(detalhe.id_pedido, status);
+      setDetalhe(await detalharPedido(detalhe.id_pedido));
+      await carregar();
+    } catch (e) {
+      Alert.alert('Pedido', e.message);
+    } finally {
+      setAvancando(false);
     }
   }
 
@@ -636,6 +650,22 @@ export default function Profile({
                 ) : null}
                 {detalhe.status === 'AGUARDANDO_PAGAMENTO' ? (
                   <PrimaryButton label="Cancelar pedido" variant="secondary" onPress={cancelar} />
+                ) : null}
+                {admin && detalhe.status === 'PAGO' ? (
+                  <PrimaryButton
+                    label={avancando ? 'Atualizando...' : 'Marcar como enviado'}
+                    icon="truck"
+                    loading={avancando}
+                    onPress={() => avancarStatus('ENVIADO')}
+                  />
+                ) : null}
+                {admin && detalhe.status === 'ENVIADO' ? (
+                  <PrimaryButton
+                    label={avancando ? 'Atualizando...' : 'Marcar como entregue'}
+                    icon="check-circle"
+                    loading={avancando}
+                    onPress={() => avancarStatus('ENTREGUE')}
+                  />
                 ) : null}
               </View>
             </View>

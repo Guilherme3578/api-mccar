@@ -48,6 +48,10 @@ export function cancelarPedido(id) {
   return api.put('/pedidos/' + id, { status: 'CANCELADO' });
 }
 
+export function alterarStatusPedido(id, status) {
+  return api.put('/pedidos/' + id, { status: status });
+}
+
 export function iniciarMercadoPago(idPedido) {
   return api.post('/pagamentos/mercado-pago', { id_pedido: idPedido });
 }
